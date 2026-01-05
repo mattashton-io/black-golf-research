@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-secret_token_id = os.environ.get("SECRET_MAPS")
+secret_token_id = os.environ.get("SECRET_PLACES")
 project_id=os.environ.get("GOOGLE_CLOUD_PROJECT")
 
 # Use Secret Manager as per your best practices
@@ -19,9 +19,10 @@ gmaps = googlemaps.Client(key=get_places_api_key())
 
 # Search for golf courses in a specific area
 # You can iterate this over coordinates of historically Black neighborhoods
-places_result = gmaps.places_search(
+# Use the 'places' method for Text Search
+places_result = gmaps.places(
     query='golf courses',
-    location=(38.9383, -76.8202), # Example: Washington D.C.
+    location=(38.9383, -76.8202), # Washington D.C.
     radius=24000 # 15 miles
 )
 
