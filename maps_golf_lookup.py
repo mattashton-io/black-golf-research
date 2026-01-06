@@ -17,14 +17,35 @@ def get_places_api_key():
 
 gmaps = googlemaps.Client(key=get_places_api_key())
 
-# Search for golf courses in a specific area
-# You can iterate this over coordinates of historically Black neighborhoods
-# Use the 'places' method for Text Search
-places_result = gmaps.places(
-    query='golf courses',
-    location=(38.9383, -76.8202), # Washington D.C.
-    radius=24000 # 15 miles
-)
+# Define radii to scan (in miles)
+radii_miles = [10, 12, 15, 17, 20]
+unique_courses = {}
 
-for place in places_result['results']:
-    print(f"Name: {place['name']}, Lat: {place['geometry']['location']['lat']}")
+print(f"Scanning for golf courses around Washington D.C. with radii: {radii_miles} miles...")
+
+course_count = 0
+
+for radius_mi in radii_miles:
+    radius_meters = int(radius_mi * 1609.34)
+    print(f"\nScanning with radius: {radius_mi} miles ({radius_meters} meters)...")
+    
+    # Search for golf courses in a specific area
+    # You can iterate this over coordinates of historically Black neighborhoods
+    # Use the 'places' method for Text Search
+    places_result = gmaps.places(
+        query='golf courses',
+        location=(38.9383, -76.8202), # Washington D.C.
+        radius=radius_meters
+    )
+
+    for place in places_result.get('results', []):
+        place_id = place['place_id']
+        if place_id not in unique_courses:
+            course_count += 1
+            unique_courses[place_id] = place
+            print(f"New Course Found - Name: {place['name']}, Lat: {place['geometry']['location']['lat']}, Lng: {place['geometry']['location']['lng']}")
+        else:
+            # Course already found in a smaller radius
+            pass
+    print(f"Courses found at {radius_mi} miles: {course_count}")
+print(f"\nTotal unique courses found across all radii: {course_count}")
