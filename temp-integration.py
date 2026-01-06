@@ -4,9 +4,9 @@ import json
 import csv
 import io
 import requests
-from datetime import datetime
 from google.cloud import secretmanager
 from google.cloud import storage
+from google.cloud import bigquery
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -34,25 +34,6 @@ def get_census_api_key():
 
 MAPS_KEY = get_places_api_key()
 CENSUS_KEY = get_census_api_key()
-
-def load_from_gcs():
-    """Load existing golf course data to avoid redundant API calls."""
-    try:
-        storage_client = storage.Client()
-        bucket = storage_client.bucket(secret_bucket_id)
-        blob = bucket.blob("golf_courses.json")
-        if blob.exists():
-            content = blob.download_as_text()
-            data = json.loads(content)
-            if isinstance(data, dict) and "results" in data:
-                print(f"Loaded {len(data['results'])} courses from GCS.")
-                return {item['place_id']: item for item in data['results']}, data.get("metadata", {})
-            elif isinstance(data, list):
-                print(f"Loaded {len(data)} courses from GCS (legacy format).")
-                return {item['place_id']: item for item in data}, {}
-    except Exception as e:
-        print(f"Note: Could not load existing data (or bucket empty): {e}")
-    return {}, {}
 
 def get_census_tract(lat, lng):
     """Convert Lat/Lng to Census Tract GEOID using Census Geocoder."""
@@ -89,37 +70,24 @@ def get_demographics(state, county, tract):
     except Exception:
         return None
 
-
-def export_to_gcs(courses_dict, origin, radii):
+def export_to_gcs(courses_dict):
     storage_client = storage.Client()
     bucket = storage_client.bucket(secret_bucket_id)
 
-    metadata = {
-        "search_origin": {"lat": origin[0], "lng": origin[1]},
-        "radii_searched_miles": radii,
-        "last_updated": datetime.now().isoformat(),
-        "total_courses": len(courses_dict)
-    }
-
     # Export to JSON
-    json_output = {
-        "metadata": metadata,
-        "results": list(courses_dict.values())
-    }
-    json_data = json.dumps(json_output, indent=2)
+    json_data = json.dumps(list(courses_dict.values()), indent=2)
     json_blob = bucket.blob("golf_courses.json")
     json_blob.upload_from_string(json_data, content_type="application/json")
-    print(f"Successfully exported to gs://{secret_bucket_id}/golf_courses.json")
+    print(f"Successfully exported {len(courses_dict)} courses to gs://{secret_bucket_id}/golf_courses.json")
 
     # Export to CSV
     output = io.StringIO()
     if courses_dict:
-        fieldnames = ['name', 'address', 'lat', 'lng', 'place_id', 'rating', 'user_ratings_total', 
-                      'census_geoid', 'pct_black', 'total_pop', 'search_lat', 'search_lng', 'radii_scanned']
+        fieldnames = ['name', 'address', 'lat', 'lng', 'place_id', 'rating', 'user_ratings_total', 'census_geoid', 'pct_black', 'total_pop']
         writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         for course in courses_dict.values():
-            row = {
+            writer.writerow({
                 'name': course.get('name'),
                 'address': course.get('formatted_address', course.get('vicinity', '')),
                 'lat': course['geometry']['location']['lat'],
@@ -129,57 +97,67 @@ def export_to_gcs(courses_dict, origin, radii):
                 'user_ratings_total': course.get('user_ratings_total'),
                 'census_geoid': course.get('census_geoid'),
                 'pct_black': course.get('pct_black'),
-                'total_pop': course.get('total_pop'),
-                'search_lat': origin[0],
-                'search_lng': origin[1],
-                'radii_scanned': str(radii)
-            }
-            writer.writerow(row)
+                'total_pop': course.get('total_pop')
+            })
 
     csv_blob = bucket.blob("golf_courses.csv")
     csv_blob.upload_from_string(output.getvalue(), content_type="text/csv")
-    print(f"Successfully exported to gs://{secret_bucket_id}/golf_courses.csv")
+    print(f"Successfully exported {len(courses_dict)} courses to gs://{secret_bucket_id}/golf_courses.csv")
+
+def analyze_with_bigquery():
+    """Run a BigQuery analysis on the CSV data stored in GCS."""
+    client = bigquery.Client()
+    uri = f"gs://{secret_bucket_id}/golf_courses.csv"
+    
+    # Configure an External Table to query the GCS file directly
+    external_config = bigquery.ExternalConfig("CSV")
+    external_config.source_uris = [uri]
+    external_config.options.skip_leading_rows = 1
+    external_config.autodetect = True
+
+    table_id = f"{project_id}.temp_golf_analysis.golf_courses_external"
+    
+    # Simple query to find courses in neighborhoods with > 20% Black population
+    query = f"""
+        SELECT name, pct_black, total_pop
+        FROM `{table_id}`
+        WHERE pct_black > 20
+        ORDER BY pct_black DESC
+    """
+    
+    print(f"\nRunning BigQuery analysis on {uri}...")
+    try:
+        # We use a temporary table reference for the query
+        job_config = bigquery.QueryJobConfig(table_definitions={ "golf_courses_external": external_config })
+        query_job = client.query(query, job_config=job_config)
+        results = query_job.result()
+        
+        print("\nBigQuery Results (>20% Black Population):")
+        for row in results:
+            print(f" - {row.name}: {row.pct_black}%")
+    except Exception as e:
+        print(f"BigQuery analysis failed: {e}")
 
 gmaps = googlemaps.Client(key=MAPS_KEY)
 
-# Search parameters
-search_origin = (38.9383, -76.8202) # Washington D.C.
-radii_miles = [10, 12, 15, 17, 20]
+# Define radii to scan (in miles)
+radii_miles = [10] # Reduced for quick testing
+unique_courses = {}
 
-# Load existing data
-unique_courses, existing_metadata = load_from_gcs()
-course_count = len(unique_courses)
-
-print(f"Starting scan around {search_origin} with radii: {radii_miles} miles...")
+print(f"Scanning for golf courses around Washington D.C...")
 
 for radius_mi in radii_miles:
-    # Skip if this radius was already checked for this origin
-    if (abs(existing_metadata.get("search_origin", {}).get("lat") - search_origin[0]) < 1e-6 and 
-        abs(existing_metadata.get("search_origin", {}).get("lng") - search_origin[1]) < 1e-6 and 
-        radius_mi in existing_metadata.get("radii_searched_miles", [])):
-        print(f"\nSkipping radius: {radius_mi} miles (already checked for this origin).")
-        continue
-
     radius_meters = int(radius_mi * 1609.34)
-    print(f"\nScanning with radius: {radius_mi} miles ({radius_meters} meters)...")
-    
-    # Search for golf courses in a specific area
-    # You can iterate this over coordinates of historically Black neighborhoods
-    # Use the 'places' method for Text Search
     places_result = gmaps.places(
         query='golf courses',
-        location=search_origin,
+        location=(38.9383, -76.8202),
         radius=radius_meters
     )
 
     for place in places_result.get('results', []):
         place_id = place['place_id']
         if place_id not in unique_courses:
-            course_count += 1
             unique_courses[place_id] = place
-            print(f"New Course Found - Name: {place['name']}, Lat: {place['geometry']['location']['lat']}, Lng: {place['geometry']['location']['lng']}")
-            
-            # Fetch Census Data
             geo_info = get_census_tract(place['geometry']['location']['lat'], place['geometry']['location']['lng'])
             if geo_info:
                 place['census_geoid'] = geo_info['geoid']
@@ -187,25 +165,9 @@ for radius_mi in radii_miles:
                 if stats:
                     place['pct_black'] = stats['pct_black']
                     place['total_pop'] = stats['total_pop']
-                    print(f"  - Neighborhood: {stats['pct_black']}% Black (Pop: {stats['total_pop']})")
-                    if stats['pct_black'] > 50:
-                        print("  - [INSIGHT]: Located in a Majority-Black Neighborhood.")
-                else:
-                    print("  - Demographic data unavailable.")
-            else:
-                print("  - Geocoding failed.")
-        else:
-            # Course already found in a smaller radius
-            pass
-    print(f"Courses found at {radius_mi} miles: {course_count}")
 
-print(f"\nTotal unique courses found across all radii: {course_count}")
+# Export to GCS
+export_to_gcs(unique_courses)
 
-# Merge radii history if origin matches
-final_radii = list(set(radii_miles) | set(existing_metadata.get("radii_searched_miles", []))) if (
-    abs(existing_metadata.get("search_origin", {}).get("lat") - search_origin[0]) < 1e-6 and
-    abs(existing_metadata.get("search_origin", {}).get("lng") - search_origin[1]) < 1e-6
-) else radii_miles
-
-# Export results to GCS
-export_to_gcs(unique_courses, search_origin, sorted(final_radii))
+# Analyze with BigQuery
+analyze_with_bigquery()

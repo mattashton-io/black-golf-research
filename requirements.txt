@@ -5,3 +5,4 @@ google-genai
 Flask
 google-cloud-storage
 requests
+google-cloud-bigquery
