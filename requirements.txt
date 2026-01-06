@@ -3,3 +3,4 @@ google-cloud-secret-manager
 python-dotenv
 google-genai
 Flask
+google-cloud-storage
