@@ -3,6 +3,7 @@ import os
 import json
 import csv
 import io
+import time
 import requests
 from datetime import datetime
 from google.cloud import secretmanager
@@ -75,12 +76,13 @@ def get_demographics(state, county, tract):
     base_url = "https://api.census.gov/data/2022/acs/acs5"
     params = {
         "get": "NAME,B02001_003E,B01003_001E",
-        "for": f"census tract:{tract}",
+        "for": f"tract:{tract}",
         "in": f"state:{state} county:{county}",
         "key": CENSUS_KEY
     }
     try:
         response = requests.get(base_url, params=params)
+        response.raise_for_status()
         data = response.json()
         black_pop = int(data[1][1])
         total_pop = int(data[1][2])
@@ -88,6 +90,9 @@ def get_demographics(state, county, tract):
         return {"pct_black": round(pct_black, 2), "total_pop": total_pop}
     except Exception as e:
         print(f"Error getting demographics: {e}")
+        if 'response' in locals():
+            print(f"Response Status: {response.status_code}")
+            print(f"Response Body: {response.text[:200]}")
         return None
 
 
@@ -141,6 +146,31 @@ def export_to_gcs(courses_dict, origin, radii):
     csv_blob.upload_from_string(output.getvalue(), content_type="text/csv")
     print(f"Successfully exported to gs://{secret_bucket_id}/golf_courses.csv")
 
+def enrich_course_with_demographics(place):
+    """Fetches and appends demographic data to a place object if possible."""
+    try:
+        lat = place['geometry']['location']['lat']
+        lng = place['geometry']['location']['lng']
+        
+        geo_info = get_census_tract(lat, lng)
+        if geo_info:
+            place['census_geoid'] = geo_info['geoid']
+            stats = get_demographics(geo_info['state'], geo_info['county'], geo_info['tract'])
+            if stats:
+                place['pct_black'] = stats['pct_black']
+                place['total_pop'] = stats['total_pop']
+                print(f"  - Neighborhood: {stats['pct_black']}% Black (Pop: {stats['total_pop']})")
+                if stats['pct_black'] > 50:
+                    print("  - [INSIGHT]: Located in a Majority-Black Neighborhood.")
+                return True
+            else:
+                print("  - Demographic data unavailable.")
+        else:
+            print("  - Geocoding failed.")
+    except Exception as e:
+        print(f"  - Error during enrichment: {e}")
+    return False
+
 gmaps = googlemaps.Client(key=MAPS_KEY)
 
 # Search parameters
@@ -149,6 +179,23 @@ radii_miles = [10, 12, 15, 17, 20]
 
 # Load existing data
 unique_courses, existing_metadata = load_from_gcs()
+
+# Enrich existing courses if missing data, otherwise print info
+print(f"Checking {len(unique_courses)} loaded courses for demographics...")
+for place_id, place in unique_courses.items():
+    pct_black = place.get('pct_black')
+    
+    if pct_black is None:
+        print(f"Enriching loaded course: {place.get('name')}")
+        enrich_course_with_demographics(place)
+        time.sleep(0.5) # Rate limit protection
+    else:
+        print(f"Loaded course: {place.get('name')}")
+        total_pop = place.get('total_pop', 'Unknown')
+        print(f"  - Neighborhood: {pct_black}% Black (Pop: {total_pop})")
+        if pct_black > 50:
+            print("  - [INSIGHT]: Located in a Majority-Black Neighborhood.")
+
 course_count = len(unique_courses)
 
 # Check if existing data matches current search origin
@@ -184,30 +231,21 @@ for radius_mi in radii_miles:
 
     for place in places_result.get('results', []):
         place_id = place['place_id']
+        
         if place_id not in unique_courses:
             course_count += 1
             unique_courses[place_id] = place
             print(f"New Course Found - Name: {place['name']}, Lat: {place['geometry']['location']['lat']}, Lng: {place['geometry']['location']['lng']}")
-            
-            # Fetch Census Data
-            geo_info = get_census_tract(place['geometry']['location']['lat'], place['geometry']['location']['lng'])
-            if geo_info:
-                place['census_geoid'] = geo_info['geoid']
-                stats = get_demographics(geo_info['state'], geo_info['county'], geo_info['tract'])
-                if stats:
-                    place['pct_black'] = stats['pct_black']
-                    place['total_pop'] = stats['total_pop']
-                    print(f"  - Neighborhood: {stats['pct_black']}% Black (Pop: {stats['total_pop']})")
-                    if stats['pct_black'] > 50:
-                        print("  - [INSIGHT]: Located in a Majority-Black Neighborhood.")
-                else:
-                    print("  - Demographic data unavailable.")
-            else:
-                print("  - Geocoding failed.")
+            enrich_course_with_demographics(place)
         else:
-            # Course already found in a smaller radius
-            pass
-    print(f"Courses found at {radius_mi} miles: {course_count}")
+            # Check if existing course needs demographics enrichment
+            existing_place = unique_courses[place_id]
+            if existing_place.get('pct_black') is None:
+                print(f"Enriching existing course: {existing_place.get('name')}")
+                # If enrichment succeeds, it returns True, we might want to count it or just proceed
+                enrich_course_with_demographics(existing_place)
+    
+    print(f"Courses found at {radius_mi} miles (cumulative unique: {len(unique_courses)})")
 
 print(f"\nTotal unique courses found across all radii: {course_count}")
 
