@@ -86,7 +86,8 @@ def get_demographics(state, county, tract):
         total_pop = int(data[1][2])
         pct_black = (black_pop / total_pop) * 100 if total_pop > 0 else 0
         return {"pct_black": round(pct_black, 2), "total_pop": total_pop}
-    except Exception:
+    except Exception as e:
+        print(f"Error getting demographics: {e}")
         return None
 
 
@@ -150,12 +151,21 @@ radii_miles = [10, 12, 15, 17, 20]
 unique_courses, existing_metadata = load_from_gcs()
 course_count = len(unique_courses)
 
+# Check if existing data matches current search origin
+existing_origin = existing_metadata.get("search_origin", {})
+prev_lat = existing_origin.get("lat")
+prev_lng = existing_origin.get("lng")
+is_same_origin = (
+    prev_lat is not None and prev_lng is not None and
+    abs(prev_lat - search_origin[0]) < 1e-6 and
+    abs(prev_lng - search_origin[1]) < 1e-6
+)
+
 print(f"Starting scan around {search_origin} with radii: {radii_miles} miles...")
 
 for radius_mi in radii_miles:
     # Skip if this radius was already checked for this origin
-    if (abs(existing_metadata.get("search_origin", {}).get("lat") - search_origin[0]) < 1e-6 and 
-        abs(existing_metadata.get("search_origin", {}).get("lng") - search_origin[1]) < 1e-6 and 
+    if (is_same_origin and 
         radius_mi in existing_metadata.get("radii_searched_miles", [])):
         print(f"\nSkipping radius: {radius_mi} miles (already checked for this origin).")
         continue
@@ -202,10 +212,8 @@ for radius_mi in radii_miles:
 print(f"\nTotal unique courses found across all radii: {course_count}")
 
 # Merge radii history if origin matches
-final_radii = list(set(radii_miles) | set(existing_metadata.get("radii_searched_miles", []))) if (
-    abs(existing_metadata.get("search_origin", {}).get("lat") - search_origin[0]) < 1e-6 and
-    abs(existing_metadata.get("search_origin", {}).get("lng") - search_origin[1]) < 1e-6
-) else radii_miles
+# Merge radii history if origin matches
+final_radii = list(set(radii_miles) | set(existing_metadata.get("radii_searched_miles", []))) if is_same_origin else radii_miles
 
 # Export results to GCS
 export_to_gcs(unique_courses, search_origin, sorted(final_radii))
