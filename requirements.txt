@@ -6,3 +6,5 @@ Flask
 google-cloud-storage
 requests
 google-cloud-bigquery
+pandas
+matplotlib

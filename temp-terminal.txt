@@ -1,7 +1,0 @@
-Loaded 31 courses from GCS (legacy format).
-Starting scan around (38.9383, -76.8202) with radii: [10, 12, 15, 17, 20] miles...
-Traceback (most recent call last):
-  File "/usr/local/google/home/mattashton/Documents/pyTutoring/ryan-sessions/black-golf-research/maps_golf_lookup.py", line 157, in <module>
-    if (abs(existing_metadata.get("search_origin", {}).get("lat") - search_origin[0]) < 1e-6 and
-            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~
-TypeError: unsupported operand type(s) for -: 'NoneType' and 'float'
