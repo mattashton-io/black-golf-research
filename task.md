@@ -1,6 +1,6 @@
 TO-DOs:
-- [x] Load csv file from GCS bucket
-- [x] Make a histogram of the percentages of Black population in the areas where the golf courses are located
-- [x] Save histogram as demographic_distribution.png
-- [x] Make a bar plot with binary split of "> 51%" vs not
-- [x] Make a cumulative histogram of Black population reach by distance from origin
+- [] Build a web app that helps users find golf courses close to input zip code
+- [] Create a map that shows the golf courses and the zip code
+- [] Show the bar chart that shows the percentage of Black population in the areas where the golf courses are located in the web app
+- [] Show the cumulative histogram that shows the percentage of Black population in the areas where the golf courses are located in the web app
+- [] Show the bar plot that shows the percentage of Black population in the areas where the golf courses are located in the web app

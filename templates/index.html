@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Golf Research</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tiger-red { background-color: #ba0c2f; }
+        .tiger-black { background-color: #000000; }
+        .tiger-border { border-color: #ba0c2f; }
+        .tiger-text { color: #ba0c2f; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-900">
+    <!-- Header -->
+    <header class="tiger-black text-white p-6 shadow-lg border-b-4 tiger-border">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-bold tracking-tight">BLACK GOLF <span class="tiger-text">RESEARCH</span></h1>
+            <div class="flex items-center space-x-4">
+                <input type="text" id="zipCode" placeholder="Enter Zip Code" class="p-2 rounded text-black border-2 border-white focus:outline-none focus:tiger-border">
+                <button onclick="performSearch()" id="searchBtn" class="tiger-red hover:bg-red-700 text-white font-bold py-2 px-6 rounded transition duration-200">
+                    SEARCH
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-6 text-center">
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Map Container -->
+            <div class="bg-white p-4 rounded-lg shadow-md border-t-4 tiger-border h-[500px]">
+                <h2 class="text-xl font-bold mb-4 tiger-black text-white p-2 rounded">Course Geographic Distribution</h2>
+                <div id="map" class="w-full h-[400px] rounded border border-gray-300"></div>
+            </div>
+
+            <!-- Plots Carousel Area -->
+            <div class="bg-white p-4 rounded-lg shadow-md border-t-4 tiger-border">
+                <h2 class="text-xl font-bold mb-4 tiger-black text-white p-2 rounded">Demographic Insights</h2>
+                <div id="plotsContainer" class="flex flex-col space-y-4 overflow-y-auto max-h-[420px]">
+                    <p class="text-gray-500 italic">Enter a zip code to see analysis plots.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Course List -->
+        <div class="bg-white p-6 rounded-lg shadow-md border-l-8 tiger-border text-left">
+            <h2 class="text-2xl font-bold mb-4 tiger-black text-white p-2 rounded inline-block">Discovered Courses</h2>
+            <div id="courseList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <p class="text-gray-500">Nearby courses will appear here.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&libraries=geometry"></script>
+    <script>
+        let map;
+        let markers = [];
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 38.9383, lng: -76.8202 }, // Default to DC
+                zoom: 10,
+                styles: [
+                    { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#000000" }] },
+                    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c8d7d4" }] }
+                ]
+            });
+        }
+
+        async function performSearch() {
+            const zip = document.getElementById("zipCode").value;
+            if (!zip) return alert("Please enter a zip code");
+
+            const btn = document.getElementById("searchBtn");
+            btn.innerHTML = "SEARCHING...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ zip_code: zip })
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    updateUI(data);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Search failed.");
+            } finally {
+                btn.innerHTML = "SEARCH";
+                btn.disabled = false;
+            }
+        }
+
+        function updateUI(data) {
+            // Update Map
+            const center = { lat: data.lat, lng: data.lng };
+            map.setCenter(center);
+            map.setZoom(11);
+
+            // Clear existing markers
+            markers.forEach(m => m.setMap(null));
+            markers = [];
+
+            // Add Origin Marker
+            new google.maps.Marker({
+                position: center,
+                map: map,
+                icon: 'http://maps.google.com/mapfiles/ms/icons/red-pushpin.png'
+            });
+
+            // Add Course Markers
+            data.courses.forEach(course => {
+                const marker = new google.maps.Marker({
+                    position: { 
+                        lat: course.geometry.location.lat, 
+                        lng: course.geometry.location.lng 
+                    },
+                    map: map,
+                    title: course.name
+                });
+                markers.push(marker);
+            });
+
+            // Update Plots
+            const plotsContainer = document.getElementById("plotsContainer");
+            plotsContainer.innerHTML = "";
+            data.plots.forEach(plot => {
+                const img = document.createElement("img");
+                img.src = `/search_plot/${plot}?t=${new Date().getTime()}`;
+                img.className = "w-full rounded shadow border tiger-border";
+                plotsContainer.appendChild(img);
+            });
+
+            // Update Course List
+            const list = document.getElementById("courseList");
+            list.innerHTML = "";
+            data.courses.forEach(course => {
+                const div = document.createElement("div");
+                div.className = "p-4 border-l-4 tiger-border bg-gray-50 rounded shadow-sm hover:translate-x-1 transition-transform";
+                div.innerHTML = `
+                    <h3 class="font-bold tiger-text text-left">${course.name}</h3>
+                    <p class="text-sm text-gray-600 text-left">${course.formatted_address || course.vicinity || ''}</p>
+                    <div class="mt-2 flex justify-between items-center text-xs font-semibold">
+                        <span>${course.pct_black || 0}% Black Pop</span>
+                        <span class="bg-black text-white px-2 py-0.5 rounded">Pop: ${course.total_pop || 0}</span>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>

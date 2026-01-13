@@ -171,87 +171,46 @@ def enrich_course_with_demographics(place):
         print(f"  - Error during enrichment: {e}")
     return False
 
-gmaps = googlemaps.Client(key=MAPS_KEY)
-
-# Search parameters
-search_origin = (38.9383, -76.8202) # Washington D.C.
-radii_miles = [10, 12, 15, 17, 20]
-
-# Load existing data
-unique_courses, existing_metadata = load_from_gcs()
-
-# Enrich existing courses if missing data, otherwise print info
-print(f"Checking {len(unique_courses)} loaded courses for demographics...")
-for place_id, place in unique_courses.items():
-    pct_black = place.get('pct_black')
+def search_golf_courses(origin_lat, origin_lng, radii_miles):
+    """
+    Searches for golf courses around a given origin within multiple radii.
+    Returns a dictionary of unique courses.
+    """
+    gmaps = googlemaps.Client(key=MAPS_KEY)
+    unique_courses = {}
     
-    if pct_black is None:
-        print(f"Enriching loaded course: {place.get('name')}")
-        enrich_course_with_demographics(place)
-        time.sleep(0.5) # Rate limit protection
-    else:
-        print(f"Loaded course: {place.get('name')}")
-        total_pop = place.get('total_pop', 'Unknown')
-        print(f"  - Neighborhood: {pct_black}% Black (Pop: {total_pop})")
-        if pct_black > 50:
-            print("  - [INSIGHT]: Located in a Majority-Black Neighborhood.")
-
-course_count = len(unique_courses)
-
-# Check if existing data matches current search origin
-existing_origin = existing_metadata.get("search_origin", {})
-prev_lat = existing_origin.get("lat")
-prev_lng = existing_origin.get("lng")
-is_same_origin = (
-    prev_lat is not None and prev_lng is not None and
-    abs(prev_lat - search_origin[0]) < 1e-6 and
-    abs(prev_lng - search_origin[1]) < 1e-6
-)
-
-print(f"Starting scan around {search_origin} with radii: {radii_miles} miles...")
-
-for radius_mi in radii_miles:
-    # Skip if this radius was already checked for this origin
-    if (is_same_origin and 
-        radius_mi in existing_metadata.get("radii_searched_miles", [])):
-        print(f"\nSkipping radius: {radius_mi} miles (already checked for this origin).")
-        continue
-
-    radius_meters = int(radius_mi * 1609.34)
-    print(f"\nScanning with radius: {radius_mi} miles ({radius_meters} meters)...")
+    # We could optionally load from GCS here if we want to persistence, 
+    # but for the web app, we might want fresh results or a local cache.
+    # For now, let's keep it simple and just do the search.
     
-    # Search for golf courses in a specific area
-    # You can iterate this over coordinates of historically Black neighborhoods
-    # Use the 'places' method for Text Search
-    places_result = gmaps.places(
-        query='golf courses',
-        location=search_origin,
-        radius=radius_meters
-    )
-
-    for place in places_result.get('results', []):
-        place_id = place['place_id']
+    print(f"Starting scan around ({origin_lat}, {origin_lng}) with radii: {radii_miles} miles...")
+    
+    for radius_mi in radii_miles:
+        radius_meters = int(radius_mi * 1609.34)
+        print(f"\nScanning with radius: {radius_mi} miles ({radius_meters} meters)...")
         
-        if place_id not in unique_courses:
-            course_count += 1
-            unique_courses[place_id] = place
-            print(f"New Course Found - Name: {place['name']}, Lat: {place['geometry']['location']['lat']}, Lng: {place['geometry']['location']['lng']}")
-            enrich_course_with_demographics(place)
-        else:
-            # Check if existing course needs demographics enrichment
-            existing_place = unique_courses[place_id]
-            if existing_place.get('pct_black') is None:
-                print(f"Enriching existing course: {existing_place.get('name')}")
-                # If enrichment succeeds, it returns True, we might want to count it or just proceed
-                enrich_course_with_demographics(existing_place)
-    
-    print(f"Courses found at {radius_mi} miles (cumulative unique: {len(unique_courses)})")
+        try:
+            places_result = gmaps.places(
+                query='golf courses',
+                location=(origin_lat, origin_lng),
+                radius=radius_meters
+            )
 
-print(f"\nTotal unique courses found across all radii: {course_count}")
+            for place in places_result.get('results', []):
+                place_id = place['place_id']
+                
+                if place_id not in unique_courses:
+                    unique_courses[place_id] = place
+                    print(f"New Course Found - Name: {place['name']}")
+                    enrich_course_with_demographics(place)
+        except Exception as e:
+            print(f"Error during search at radius {radius_mi}: {e}")
+            
+    return unique_courses
 
-# Merge radii history if origin matches
-# Merge radii history if origin matches
-final_radii = list(set(radii_miles) | set(existing_metadata.get("radii_searched_miles", []))) if is_same_origin else radii_miles
-
-# Export results to GCS
-export_to_gcs(unique_courses, search_origin, sorted(final_radii))
+if __name__ == "__main__":
+    # Example execution if run directly
+    search_origin = (38.9383, -76.8202) # Washington D.C.
+    radii = [10, 15]
+    results = search_golf_courses(search_origin[0], search_origin[1], radii)
+    print(f"Total unique courses found: {len(results)}")
