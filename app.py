@@ -23,24 +23,39 @@ from maps_golf_lookup import API_TIMEOUT
 gmaps_client = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
 
 def get_weather_for_location(lat, lng):
-    """Fetches latest temperature from WeatherNext BigQuery dataset."""
+    """Fetches latest temperature from WeatherNext BigQuery dataset using a small polygon."""
     try:
+        # Create a small bounding box (approx 1km) to optimize spatial join
+        delta = 0.01 # ~ ±1km
+        poly_wkt = f"POLYGON(({lng-delta} {lat-delta}, {lng+delta} {lat-delta}, {lng+delta} {lat+delta}, {lng-delta} {lat+delta}, {lng-delta} {lat-delta}))"
+        
+        table_id = "pytutoring-dev.weathernext_2.weathernext_2_0_0"
         query = f"""
         SELECT
-            e.`2m_temperature` - 273.15 AS temperature_c
+            t1.geography_polygon,
+            t2.time AS time,
+            e_id,
+            e.`2m_temperature`,
         FROM
-            `pytutoring-dev.weathernext_2.weathernext_2_0_0` AS t1, 
+            `{table_id}` AS t1, 
             t1.forecast as t2, 
-            UNNEST(t2.ensemble) as e
-        WHERE ST_INTERSECTS(t1.geography_polygon, ST_GEOGPOINT({lng}, {lat}))
-          AND t1.init_time = (SELECT MAX(init_time) FROM `pytutoring-dev.weathernext_2.weathernext_2_0_0`)
+            UNNEST(t2.ensemble) as e WITH OFFSET as e_id
+        WHERE ST_INTERSECTS(t1.geography_polygon, ST_GEOGFROMTEXT('{poly_wkt}'))
+          AND t1.init_time = TIMESTAMP('2025-10-03 00:00:00 UTC') 
         ORDER BY t2.time
-        LIMIT 1
         """
+        print("line 48 - query loaded")
         query_job = bq_client.query(query)
-        results = query_job.to_dataframe()
-        if not results.empty:
-            return round(results['temperature_c'].iloc[0], 1)
+        print("line 49 - query job")
+        # Use a timeout to prevent long-running queries
+        results = query_job.result()
+        print("line 51 - query result")
+        print("Forecast results = ", results)
+        for row in results:
+            print("row = ", row)
+            print("row.keys = ", row.keys())
+            print("row.2m_temperature = ", row['2m_temperature'])
+            return round((row['2m_temperature'] - 273.15) * 9/5 + 32, 0)
     except Exception as e:
         print(f"Weather BQ Error: {e}")
     return None
@@ -62,11 +77,14 @@ def search():
     from maps_golf_lookup import load_from_gcs, save_to_zip_cache
     cached_data = load_from_gcs(zip_code=zip_code)
     if cached_data and isinstance(cached_data, dict):
-        # Ensure cached data is complete for frontend
-        if all(k in cached_data for k in ['lat', 'lng', 'courses', 'plots']):
+        # Ensure cached data is complete for frontend and contains NEW demographics
+        courses = cached_data.get('courses', [])
+        has_new_demographics = courses and 'pct_white' in courses[0]
+        
+        if all(k in cached_data for k in ['lat', 'lng', 'courses', 'plots']) and has_new_demographics:
             return jsonify(cached_data)
         else:
-            print(f"Incomplete cache found for {zip_code}, re-searching.")
+            print(f"Incomplete or stale cache found for {zip_code}, re-searching.")
 
     # 1. Geocode zip code
     try:

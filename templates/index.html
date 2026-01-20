@@ -307,7 +307,7 @@
                         })
                     });
                     const wData = await wRes.json();
-                    document.getElementById("modalWeather").innerText = wData.temperature !== null ? `${wData.temperature}°C` : 'N/A';
+                    document.getElementById("modalWeather").innerText = wData.temperature !== null ? `${wData.temperature}°F` : 'N/A';
                 } catch (e) {
                     document.getElementById("modalWeather").innerText = "Error";
                 }
@@ -317,23 +317,37 @@
             }
 
             function updateDemographicChart(course) {
+                console.log("Updating demographic chart for course:", course.name);
                 const ctx = document.getElementById('demographicChart').getContext('2d');
 
                 if (demographicChart) {
                     demographicChart.destroy();
                 }
 
+                // Check for data presence
+                const demoData = [
+                    course.pct_black || 0,
+                    course.pct_white || 0,
+                    course.pct_hispanic || 0,
+                    course.pct_asian || 0,
+                    course.pct_native || 0,
+                    course.pct_pacific || 0
+                ];
+
+                const hasData = demoData.some(val => val > 0);
+                if (!hasData) {
+                    console.warn("No demographic data available for this course.");
+                    // Draw placeholder text or leave empty
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.textAlign = 'center';
+                    ctx.fillText('No demographic data found in cache.', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    return;
+                }
+
                 const data = {
                     labels: ['Black', 'White', 'Hispanic', 'Asian', 'Native', 'Pacific'],
                     datasets: [{
-                        data: [
-                            course.pct_black || 0,
-                            course.pct_white || 0,
-                            course.pct_hispanic || 0,
-                            course.pct_asian || 0,
-                            course.pct_native || 0,
-                            course.pct_pacific || 0
-                        ],
+                        data: demoData,
                         backgroundColor: [
                             '#099268', // Teal
                             '#339af0', // Blue
