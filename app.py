@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from maps_golf_lookup import search_golf_courses, MAPS_KEY
 from analysis import generate_plots
 import googlemaps
+from google.cloud import bigquery
 from dotenv import load_dotenv
 
 #loads .env
@@ -14,9 +15,35 @@ app = Flask(__name__)
 # Ensure static/plots exists
 os.makedirs("static/plots", exist_ok=True)
 
+# BigQuery client
+bq_client = bigquery.Client()
+
 # Geocoding client for zip code lookup
 from maps_golf_lookup import API_TIMEOUT
 gmaps_client = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
+
+def get_weather_for_location(lat, lng):
+    """Fetches latest temperature from WeatherNext BigQuery dataset."""
+    try:
+        query = f"""
+        SELECT
+            e.`2m_temperature` - 273.15 AS temperature_c
+        FROM
+            `pytutoring-dev.weathernext_2.weathernext_2_0_0` AS t1, 
+            t1.forecast as t2, 
+            UNNEST(t2.ensemble) as e
+        WHERE ST_INTERSECTS(t1.geography_polygon, ST_GEOGPOINT({lng}, {lat}))
+          AND t1.init_time = (SELECT MAX(init_time) FROM `pytutoring-dev.weathernext_2.weathernext_2_0_0`)
+        ORDER BY t2.time
+        LIMIT 1
+        """
+        query_job = bq_client.query(query)
+        results = query_job.to_dataframe()
+        if not results.empty:
+            return round(results['temperature_c'].iloc[0], 1)
+    except Exception as e:
+        print(f"Weather BQ Error: {e}")
+    return None
 
 @app.route('/')
 def index():
@@ -96,6 +123,17 @@ def search():
     save_to_zip_cache(zip_code, result)
     
     return jsonify(result)
+
+@app.route('/get_weather', methods=['POST'])
+def get_weather():
+    data = request.json
+    lat = data.get('lat')
+    lng = data.get('lng')
+    if lat is None or lng is None:
+        return jsonify({"error": "Missing lat/lng"}), 400
+    
+    temp = get_weather_for_location(lat, lng)
+    return jsonify({"temperature": temp})
 
 @app.route('/search_plot/<path:filename>')
 def serve_plot(filename):

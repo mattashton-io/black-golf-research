@@ -114,7 +114,7 @@ def get_demographics(state, county, tract):
     """Fetch ACS 5-Year estimates for a specific tract."""
     base_url = "https://api.census.gov/data/2022/acs/acs5"
     params = {
-        "get": "NAME,B02001_003E,B01003_001E,B02001_002E,B03001_003E", # Black, Total, White, Hispanic
+        "get": "NAME,B01003_001E,B02001_003E,B02001_002E,B03001_003E,B02001_005E,B02001_004E,B02001_006E", # Total, Black, White, Hispanic, Asian, Native American, Pacific Islander
         "for": f"tract:{tract}",
         "in": f"state:{state} county:{county}",
         "key": CENSUS_KEY
@@ -140,21 +140,30 @@ def get_demographics(state, county, tract):
             print(f"No demographic data returned for tract {tract}")
             return None
             
-        black_pop = int(data[1][1])
-        total_pop = int(data[1][2])
+        # Mapping indices based on "get" params
+        # 0: NAME, 1: Total, 2: Black, 3: White, 4: Hispanic, 5: Asian, 6: NativeAmerican, 7: PacificIslander
+        total_pop = int(data[1][1])
+        black_pop = int(data[1][2])
         white_pop = int(data[1][3])
         hispanic_pop = int(data[1][4])
+        asian_pop = int(data[1][5])
+        native_pop = int(data[1][6])
+        pacific_pop = int(data[1][7])
         
-        pct_black = (black_pop / total_pop) * 100 if total_pop > 0 else 0
-        pct_white = (white_pop / total_pop) * 100 if total_pop > 0 else 0
-        pct_hispanic = (hispanic_pop / total_pop) * 100 if total_pop > 0 else 0
-        
+        def calc_pct(val, total):
+            return round((val / total) * 100, 2) if total > 0 else 0
+
         # Plurality check
         is_plurality_black = (black_pop > white_pop) and (black_pop > hispanic_pop)
         
         return {
-            "pct_black": round(pct_black, 2), 
             "total_pop": total_pop,
+            "pct_black": calc_pct(black_pop, total_pop), 
+            "pct_white": calc_pct(white_pop, total_pop),
+            "pct_hispanic": calc_pct(hispanic_pop, total_pop),
+            "pct_asian": calc_pct(asian_pop, total_pop),
+            "pct_native": calc_pct(native_pop, total_pop),
+            "pct_pacific": calc_pct(pacific_pop, total_pop),
             "is_plurality_black": is_plurality_black
         }
     except Exception as e:
@@ -234,6 +243,11 @@ def enrich_course_with_demographics(place):
             stats = get_demographics(geo_info['state'], geo_info['county'], geo_info['tract'])
             if stats:
                 place['pct_black'] = stats['pct_black']
+                place['pct_white'] = stats['pct_white']
+                place['pct_hispanic'] = stats['pct_hispanic']
+                place['pct_asian'] = stats['pct_asian']
+                place['pct_native'] = stats['pct_native']
+                place['pct_pacific'] = stats['pct_pacific']
                 place['total_pop'] = stats['total_pop']
                 place['is_plurality_black'] = stats.get('is_plurality_black', False)
                 place['is_holc_redlined'] = is_in_holc_redlined_zone(lat, lng)

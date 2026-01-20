@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Black Golf Research</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bgr-teal: #099268;
@@ -33,7 +34,7 @@
         .bg-card { background-color: var(--bg-card); border-color: var(--border-color); }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-900">
+<body class="font-sans">
     <!-- Header -->
     <header class="bgr-dark-bg text-white p-6 shadow-lg border-b-4 bgr-teal-border">
         <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
@@ -105,6 +106,45 @@
                 <p class="text-gray-500">Nearby courses will appear here.</p>
             </div>
         </div>
+<!-- Details Modal -->
+<div id="detailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+    <div class="bg-card w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden border-2 bgr-teal-border">
+        <div class="bgr-dark-bg p-4 text-white flex justify-between items-center">
+            <h2 id="modalName" class="text-xl font-bold">Course Details</h2>
+            <button onclick="closeModal()" class="text-2xl hover:text-gray-300">&times;</button>
+        </div>
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
+            <div>
+                <div class="mb-4">
+                    <label class="text-[10px] uppercase font-bold text-gray-400">Address</label>
+                    <p id="modalAddress" class="text-sm italic">N/A</p>
+                </div>
+                <div class="mb-4">
+                    <label class="text-[10px] uppercase font-bold text-gray-400">Phone</label>
+                    <p id="modalPhone" class="text-sm">N/A</p>
+                </div>
+                <div class="mb-4">
+                    <label class="text-[10px] uppercase font-bold text-gray-400">Website</label>
+                    <a id="modalWebsite" href="#" target="_blank"
+                        class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
+                </div>
+                <div class="mt-6 p-4 rounded bg-gray-50 dark:bg-gray-800 border bgr-teal-border">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold">Current Weather</span>
+                        <span id="modalWeather" class="text-xl font-bold bgr-teal-text">Loading...</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-1">Source: WeatherNext BigQuery</p>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-center font-bold mb-4">Neighborhood Demographics</h4>
+                <div class="relative h-64">
+                    <canvas id="demographicChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
     </main>
 
     <!-- Google Maps API -->
@@ -112,6 +152,8 @@
     <script>
         let map;
         let markers = [];
+            let currentCourses = {};
+            let demographicChart = null;
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
@@ -152,6 +194,8 @@
                 if (data.error) {
                     alert(data.error);
                 } else {
+                    currentCourses = {};
+                    data.courses.forEach(c => currentCourses[c.place_id] = c);
                     updateUI(data);
                 }
             } catch (e) {
@@ -208,18 +252,117 @@
             list.innerHTML = "";
             data.courses.forEach(course => {
                 const div = document.createElement("div");
-                div.className = "p-4 border-l-4 bgr-teal-border bg-card rounded shadow-sm hover:translate-x-1 transition-transform";
+                div.className = "p-4 border-l-4 bgr-teal-border bg-card rounded shadow-sm hover:translate-x-1 transition-transform flex flex-col justify-between";
                 div.innerHTML = `
-                    <h3 class="font-bold bgr-teal-text text-left">${course.name}</h3>
-                    <p class="text-sm text-gray-500 text-left">${course.formatted_address || course.vicinity || ''}</p>
-                    <div class="mt-2 flex justify-between items-center text-xs font-semibold">
-                        <span>${course.pct_black || 0}% Black Pop</span>
-                        <span class="bg-card text-main border border-gray-500 px-2 py-0.5 rounded">Pop: ${course.total_pop || 0}</span>
+                    <div>
+                        <h3 class="font-bold bgr-teal-text text-left">${course.name}</h3>
+                        <p class="text-sm text-gray-500 text-left line-clamp-2">${course.formatted_address || course.vicinity || ''}</p>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-2">
+                        <div class="flex justify-between items-center text-xs font-semibold">
+                            <span>${course.pct_black || 0}% Black Pop</span>
+                            <span class="bg-card text-main border border-gray-500 px-2 py-0.5 rounded">Pop: ${course.total_pop || 0}</span>
+                        </div>
+                        <button onclick="showCourseDetails('${course.place_id}')" class="w-full py-1 text-xs font-bold uppercase border bgr-teal-border bgr-teal-text hover:bg-teal-500 hover:text-white transition">
+                            View Details
+                        </button>
                     </div>
                 `;
                 list.appendChild(div);
             });
         }
+
+            function closeModal() {
+                document.getElementById("detailsModal").classList.add("hidden");
+            }
+
+            async function showCourseDetails(placeId) {
+                const course = currentCourses[placeId];
+                if (!course) return;
+
+                document.getElementById("modalName").innerText = course.name;
+                document.getElementById("modalAddress").innerText = course.formatted_address || course.vicinity || 'N/A';
+                document.getElementById("modalPhone").innerText = course.formatted_phone_number || 'N/A';
+
+                const website = document.getElementById("modalWebsite");
+                if (course.website) {
+                    website.href = course.website;
+                    website.innerText = course.website;
+                    website.classList.remove("hidden");
+                } else {
+                    website.innerText = "N/A";
+                }
+
+                document.getElementById("modalWeather").innerText = "Loading...";
+                document.getElementById("detailsModal").classList.remove("hidden");
+
+                // Fetch Weather
+                try {
+                    const wRes = await fetch('/get_weather', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            lat: course.geometry.location.lat,
+                            lng: course.geometry.location.lng
+                        })
+                    });
+                    const wData = await wRes.json();
+                    document.getElementById("modalWeather").innerText = wData.temperature !== null ? `${wData.temperature}°C` : 'N/A';
+                } catch (e) {
+                    document.getElementById("modalWeather").innerText = "Error";
+                }
+
+                // Update Chart
+                updateDemographicChart(course);
+            }
+
+            function updateDemographicChart(course) {
+                const ctx = document.getElementById('demographicChart').getContext('2d');
+
+                if (demographicChart) {
+                    demographicChart.destroy();
+                }
+
+                const data = {
+                    labels: ['Black', 'White', 'Hispanic', 'Asian', 'Native', 'Pacific'],
+                    datasets: [{
+                        data: [
+                            course.pct_black || 0,
+                            course.pct_white || 0,
+                            course.pct_hispanic || 0,
+                            course.pct_asian || 0,
+                            course.pct_native || 0,
+                            course.pct_pacific || 0
+                        ],
+                        backgroundColor: [
+                            '#099268', // Teal
+                            '#339af0', // Blue
+                            '#fab005', // Yellow
+                            '#be4bdb', // Grape
+                            '#fa5252', // Red
+                            '#15aabf'  // Cyan
+                        ]
+                    }]
+                };
+
+                demographicChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 10 }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
 
                     function toggleDarkMode() {
                         document.body.classList.toggle('dark');
