@@ -6,6 +6,7 @@ from analysis import generate_plots
 import googlemaps
 from dotenv import load_dotenv
 
+#loads .env
 load_dotenv()
 
 app = Flask(__name__)
@@ -14,7 +15,8 @@ app = Flask(__name__)
 os.makedirs("static/plots", exist_ok=True)
 
 # Geocoding client for zip code lookup
-gmaps_client = googlemaps.Client(key=MAPS_KEY)
+from maps_golf_lookup import API_TIMEOUT
+gmaps_client = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
 
 @app.route('/')
 def index():
@@ -24,10 +26,21 @@ def index():
 def search():
     data = request.json
     zip_code = data.get('zip_code')
+    target_black_majority = data.get('target_black_majority', True) # Default to True
     
     if not zip_code:
         return jsonify({"error": "No zip code provided"}), 400
     
+    # 0. Check GCS Cache
+    from maps_golf_lookup import load_from_gcs, save_to_zip_cache
+    cached_data = load_from_gcs(zip_code=zip_code)
+    if cached_data and isinstance(cached_data, dict):
+        # Ensure cached data is complete for frontend
+        if all(k in cached_data for k in ['lat', 'lng', 'courses', 'plots']):
+            return jsonify(cached_data)
+        else:
+            print(f"Incomplete cache found for {zip_code}, re-searching.")
+
     # 1. Geocode zip code
     try:
         geocode_result = gmaps_client.geocode(zip_code)
@@ -39,17 +52,19 @@ def search():
     except Exception as e:
         return jsonify({"error": f"Geocoding error: {str(e)}"}), 500
     
-    # 2. Search golf courses (radii: 10, 20 miles)
-    radii = [10, 20]
-    courses_dict = search_golf_courses(lat, lng, radii)
+    # 2. Search golf courses (default radius: 10 miles)
+    radii = [10]
+    courses_dict = search_golf_courses(lat, lng, radii, target_black_majority=target_black_majority)
     
     if not courses_dict:
-        return jsonify({
+        result = {
             "lat": lat,
             "lng": lng,
             "courses": [],
-            "message": "No golf courses found in this area."
-        })
+            "message": "No golf courses found in this area.",
+            "plots": []
+        }
+        return jsonify(result)
     
     # 3. Convert to DataFrame for analysis
     courses_list = list(courses_dict.values())
@@ -69,12 +84,18 @@ def search():
     # 4. Generate plots
     plot_files = generate_plots(df, output_dir="static/plots")
     
-    return jsonify({
+    result = {
         "lat": lat,
         "lng": lng,
         "courses": courses_list,
-        "plots": plot_files
-    })
+        "plots": plot_files,
+        "message": f"Found {len(courses_list)} courses."
+    }
+    
+    # 5. Cache results to GCS
+    save_to_zip_cache(zip_code, result)
+    
+    return jsonify(result)
 
 @app.route('/search_plot/<path:filename>')
 def serve_plot(filename):

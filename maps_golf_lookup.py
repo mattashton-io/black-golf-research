@@ -20,6 +20,9 @@ secret_census = os.environ.get("SECRET_CENSUS_API")
 # Initialize Secret Manager client
 secret_client = secretmanager.SecretManagerServiceClient()
 
+# API configuration
+API_TIMEOUT = 5 # 5 second timeout for external API calls
+
 def get_secret(secret_id):
     if not secret_id:
         return None
@@ -36,11 +39,25 @@ def get_census_api_key():
 MAPS_KEY = get_places_api_key()
 CENSUS_KEY = get_census_api_key()
 
-def load_from_gcs():
-    """Load existing golf course data to avoid redundant API calls."""
+def load_from_gcs(zip_code=None):
+    """
+    Load existing golf course data to avoid redundant API calls.
+    If zip_code is provided, it ONLY checks for specific cached results for that zip.
+    """
     try:
         storage_client = storage.Client()
         bucket = storage_client.bucket(secret_bucket_id)
+        
+        # Check for zip-specific cache if provided
+        if zip_code:
+            zip_blob = bucket.blob(f"cache/{zip_code}_results.json")
+            if zip_blob.exists():
+                print(f"Loading cached results for zip: {zip_code}")
+                content = zip_blob.download_as_text()
+                return json.loads(content)
+            return None # Return None if specific zip cache requested but not found
+
+        # Fallback to main file ONLY if no zip_code provided (e.g., initial load or global analytics)
         blob = bucket.blob("golf_courses.json")
         if blob.exists():
             content = blob.download_as_text()
@@ -52,14 +69,35 @@ def load_from_gcs():
                 print(f"Loaded {len(data)} courses from GCS (legacy format).")
                 return {item['place_id']: item for item in data}, {}
     except Exception as e:
-        print(f"Note: Could not load existing data (or bucket empty): {e}")
+        print(f"Note: Could not load existing data: {e}")
+    
+    if zip_code:
+        return None
     return {}, {}
+
+def save_to_zip_cache(zip_code, data_to_cache):
+    """Save results specifically for a zip code to GCS cache."""
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(secret_bucket_id)
+        blob = bucket.blob(f"cache/{zip_code}_results.json")
+        blob.upload_from_string(json.dumps(data_to_cache), content_type="application/json")
+        print(f"Cached results for zip: {zip_code}")
+    except Exception as e:
+        print(f"Error caching for zip {zip_code}: {e}")
 
 def get_census_tract(lat, lng):
     """Convert Lat/Lng to Census Tract GEOID using Census Geocoder."""
     url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x={lng}&y={lat}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=API_TIMEOUT)
+        response.raise_for_status()
+        
+        # Check if response is JSON
+        if "application/json" not in response.headers.get("Content-Type", ""):
+            print(f"Error: Census Geocoder returned non-JSON response: {response.text[:100]}")
+            return None
+            
         data = response.json()
         geographies = data['result']['geographies']['Census Tracts'][0]
         return {
@@ -68,32 +106,70 @@ def get_census_tract(lat, lng):
             "tract": geographies['TRACT'],
             "geoid": geographies['GEOID']
         }
-    except Exception:
+    except Exception as e:
+        print(f"Error getting census tract: {e}")
         return None
 
 def get_demographics(state, county, tract):
     """Fetch ACS 5-Year estimates for a specific tract."""
     base_url = "https://api.census.gov/data/2022/acs/acs5"
     params = {
-        "get": "NAME,B02001_003E,B01003_001E",
+        "get": "NAME,B02001_003E,B01003_001E,B02001_002E,B03001_003E", # Black, Total, White, Hispanic
         "for": f"tract:{tract}",
         "in": f"state:{state} county:{county}",
         "key": CENSUS_KEY
     }
     try:
-        response = requests.get(base_url, params=params)
+        response = requests.get(base_url, params=params, timeout=API_TIMEOUT)
+        
+        if response.status_code == 503:
+            print("Census API 503: Service Unavailable")
+            return None
+            
         response.raise_for_status()
+        
+        # Check for JSON content
+        if "application/json" not in response.headers.get("Content-Type", ""):
+            print(f"Census API returned non-JSON: {response.text[:100]}")
+            return None
+            
         data = response.json()
+        
+        # Check if data exists in the response
+        if len(data) < 2:
+            print(f"No demographic data returned for tract {tract}")
+            return None
+            
         black_pop = int(data[1][1])
         total_pop = int(data[1][2])
+        white_pop = int(data[1][3])
+        hispanic_pop = int(data[1][4])
+        
         pct_black = (black_pop / total_pop) * 100 if total_pop > 0 else 0
-        return {"pct_black": round(pct_black, 2), "total_pop": total_pop}
+        pct_white = (white_pop / total_pop) * 100 if total_pop > 0 else 0
+        pct_hispanic = (hispanic_pop / total_pop) * 100 if total_pop > 0 else 0
+        
+        # Plurality check
+        is_plurality_black = (black_pop > white_pop) and (black_pop > hispanic_pop)
+        
+        return {
+            "pct_black": round(pct_black, 2), 
+            "total_pop": total_pop,
+            "is_plurality_black": is_plurality_black
+        }
     except Exception as e:
         print(f"Error getting demographics: {e}")
-        if 'response' in locals():
-            print(f"Response Status: {response.status_code}")
-            print(f"Response Body: {response.text[:200]}")
         return None
+
+def is_in_holc_redlined_zone(lat, lng):
+    """
+    Checks if a location is in a historically redlined zone (Grade D).
+    Self-contained check for demo purposes using a simplified bounding box approach 
+    for known redlined areas if possible, or a placeholder.
+    """
+    # Placeholder: In a real app, this would query a spatial index of HOLC maps.
+    # For now, we'll mark it as 'unavailable' or 'False' unless we have data.
+    return False
 
 
 def export_to_gcs(courses_dict, origin, radii):
@@ -159,9 +235,14 @@ def enrich_course_with_demographics(place):
             if stats:
                 place['pct_black'] = stats['pct_black']
                 place['total_pop'] = stats['total_pop']
+                place['is_plurality_black'] = stats.get('is_plurality_black', False)
+                place['is_holc_redlined'] = is_in_holc_redlined_zone(lat, lng)
+                
                 print(f"  - Neighborhood: {stats['pct_black']}% Black (Pop: {stats['total_pop']})")
                 if stats['pct_black'] > 50:
                     print("  - [INSIGHT]: Located in a Majority-Black Neighborhood.")
+                if stats.get('is_plurality_black'):
+                    print("  - [INSIGHT]: Located in a Plurality-Black Neighborhood.")
                 return True
             else:
                 print("  - Demographic data unavailable.")
@@ -171,21 +252,22 @@ def enrich_course_with_demographics(place):
         print(f"  - Error during enrichment: {e}")
     return False
 
-def search_golf_courses(origin_lat, origin_lng, radii_miles):
+def search_golf_courses(origin_lat, origin_lng, radii_miles, target_black_majority=True):
     """
     Searches for golf courses around a given origin within multiple radii.
-    Returns a dictionary of unique courses.
+    If target_black_majority is True, it will auto-expand up to 25 miles if no 
+    Black-majority courses are found within the initial radii.
     """
-    gmaps = googlemaps.Client(key=MAPS_KEY)
+    gmaps = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
     unique_courses = {}
-    
-    # We could optionally load from GCS here if we want to persistence, 
-    # but for the web app, we might want fresh results or a local cache.
-    # For now, let's keep it simple and just do the search.
     
     print(f"Starting scan around ({origin_lat}, {origin_lng}) with radii: {radii_miles} miles...")
     
-    for radius_mi in radii_miles:
+    current_radii = list(radii_miles)
+    found_black_majority = False
+
+    def scan_radius(radius_mi):
+        nonlocal found_black_majority
         radius_meters = int(radius_mi * 1609.34)
         print(f"\nScanning with radius: {radius_mi} miles ({radius_meters} meters)...")
         
@@ -203,8 +285,28 @@ def search_golf_courses(origin_lat, origin_lng, radii_miles):
                     unique_courses[place_id] = place
                     print(f"New Course Found - Name: {place['name']}")
                     enrich_course_with_demographics(place)
+                    if place.get('pct_black', 0) > 50:
+                        found_black_majority = True
         except Exception as e:
             print(f"Error during search at radius {radius_mi}: {e}")
+
+    for r in current_radii:
+        scan_radius(r)
+        if target_black_majority and found_black_majority:
+            break
+
+    # Auto-expansion logic
+    if target_black_majority and not found_black_majority:
+        max_radius = 25
+        last_radius = current_radii[-1] if current_radii else 10
+        increment = 5
+        
+        while last_radius < max_radius and not found_black_majority:
+            last_radius = min(last_radius + increment, max_radius)
+            print(f"[AUTO-EXPAND] Expanding search to {last_radius} miles...")
+            scan_radius(last_radius)
+            if last_radius >= max_radius:
+                break
             
     return unique_courses
 
