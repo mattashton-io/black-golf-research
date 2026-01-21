@@ -27,8 +27,13 @@ A web application to explore and analyze the geographic distribution of golf cou
     python app.py
     ```
 
-## Technology Stack
+## GCP Setup
+1. use bash deploy.sh
+2. If error, go to artifacts registry via GCP console and deploy manually
+3. Run when deploying on GCP with public access prevention:
+gcloud run services proxy black-golf-research-21jan26 --project pytutoring-dev --region us-east4
 
+## Technology Stack
 - **Backend**: Python (Flask)
 - **Frontend**: HTML5, Vanilla CSS, Tailwind CSS, Chart.js
 - **APIs**: Google Maps, US Census Bureau
