@@ -129,11 +129,25 @@
                         class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
                 </div>
                 <div class="mt-6 p-4 rounded bg-gray-50 dark:bg-gray-800 border bgr-teal-border">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-bold">Current Weather</span>
-                        <span id="modalWeather" class="text-xl font-bold bgr-teal-text">Loading...</span>
+                    <div class="flex items-center justify-between border-b pb-2 mb-2">
+                        <span class="text-sm font-bold uppercase">Current Weather</span>
+                        <span id="modalWeather" class="text-lg font-bold bgr-teal-text">Loading...</span>
                     </div>
-                    <p class="text-[10px] text-gray-500 mt-1">Source: WeatherNext BigQuery</p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <span class="text-gray-500">Wind:</span>
+                            <span id="modalWind" class="font-bold">N/A</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Precip (6h):</span>
+                            <span id="modalPrecip" class="font-bold">N/A</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Humidity:</span>
+                            <span id="modalHumidity" class="font-bold">N/A</span>
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-gray-400 mt-2 italic text-right">Source: WeatherNext BigQuery</p>
                 </div>
             </div>
             <div>
@@ -307,8 +321,17 @@
                         })
                     });
                     const wData = await wRes.json();
-                    document.getElementById("modalWeather").innerText = wData.temperature !== null ? `${wData.temperature}°F` : 'N/A';
+
+                    if (wData.error) {
+                        document.getElementById("modalWeather").innerText = "N/A";
+                    } else {
+                        document.getElementById("modalWeather").innerText = wData.temperature !== null ? `${wData.temperature}°F` : 'N/A';
+                        document.getElementById("modalWind").innerText = wData.wind_speed !== null ? `${wData.wind_speed} mph ${wData.wind_direction}` : 'N/A';
+                        document.getElementById("modalPrecip").innerText = wData.precipitation !== null ? `${wData.precipitation} in` : 'N/A';
+                        document.getElementById("modalHumidity").innerText = wData.humidity !== null ? `${wData.humidity}%` : 'N/A';
+                    }
                 } catch (e) {
+                    console.error("Weather detection error:", e);
                     document.getElementById("modalWeather").innerText = "Error";
                 }
 

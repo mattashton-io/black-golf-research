@@ -22,8 +22,26 @@ bq_client = bigquery.Client()
 from maps_golf_lookup import API_TIMEOUT
 gmaps_client = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
 
+def calculate_wind_info(u, v):
+    """Converts U and V components (m/s) to magnitude (mph) and cardinal direction."""
+    import math
+    if u is None or v is None:
+        return None, "N/A"
+    magnitude = math.sqrt(u**2 + v**2) * 2.23694 # m/s to mph
+    # Direction: angle of the vector
+    # atan2(u, v) gives the angle in radians from the positive Y axis (North)
+    # We want the direction the wind is COMING FROM for meteorology, but 
+    # WeatherNext U/V usually represents the vector direction (wind blowing TO).
+    # However, for consistency with common dashboards, blowing direction is fine.
+    # Standard: (atan2(u, v) * 180 / pi + 180) % 360
+    direction_deg = (math.atan2(u, v) * 180 / math.pi + 180) % 360
+    
+    cardinals = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+    ix = round(direction_deg / (360 / len(cardinals))) % len(cardinals)
+    return round(magnitude, 1), cardinals[ix]
+
 def get_weather_for_location(lat, lng):
-    """Fetches latest temperature from WeatherNext BigQuery dataset using a small polygon."""
+    """Fetches latest weather stats from WeatherNext BigQuery dataset."""
     try:
         # Create a small bounding box (approx 1km) to optimize spatial join
         delta = 0.01 # ~ ±1km
@@ -32,30 +50,39 @@ def get_weather_for_location(lat, lng):
         table_id = "pytutoring-dev.weathernext_2.weathernext_2_0_0"
         query = f"""
         SELECT
-            t1.geography_polygon,
             t2.time AS time,
-            e_id,
             e.`2m_temperature`,
+            e.`total_precipitation_6hr`,
+            e.`10m_u_component_of_wind`,
+            e.`10m_v_component_of_wind`
         FROM
             `{table_id}` AS t1, 
             t1.forecast as t2, 
-            UNNEST(t2.ensemble) as e WITH OFFSET as e_id
+            UNNEST(t2.ensemble) as e
         WHERE ST_INTERSECTS(t1.geography_polygon, ST_GEOGFROMTEXT('{poly_wkt}'))
           AND t1.init_time = TIMESTAMP('2025-10-03 00:00:00 UTC') 
         ORDER BY t2.time
+        LIMIT 1
         """
-        print("line 48 - query loaded")
         query_job = bq_client.query(query)
-        print("line 49 - query job")
-        # Use a timeout to prevent long-running queries
         results = query_job.result()
-        print("line 51 - query result")
-        print("Forecast results = ", results)
+        
         for row in results:
-            print("row = ", row)
-            print("row.keys = ", row.keys())
-            print("row.2m_temperature = ", row['2m_temperature'])
-            return round((row['2m_temperature'] - 273.15) * 9/5 + 32, 0)
+            temp_f = round((row['2m_temperature'] - 273.15) * 9/5 + 32, 0)
+            precip_in = round(row['total_precipitation_6hr'] * 39.37, 2)
+            
+            wind_speed, wind_dir = calculate_wind_info(
+                row['10m_u_component_of_wind'], 
+                row['10m_v_component_of_wind']
+            )
+            
+            return {
+                "temperature": temp_f,
+                "precipitation": precip_in,
+                "wind_speed": wind_speed,
+                "wind_direction": wind_dir,
+                "humidity": None # Placeholder for missing variable
+            }
     except Exception as e:
         print(f"Weather BQ Error: {e}")
     return None
@@ -150,8 +177,10 @@ def get_weather():
     if lat is None or lng is None:
         return jsonify({"error": "Missing lat/lng"}), 400
     
-    temp = get_weather_for_location(lat, lng)
-    return jsonify({"temperature": temp})
+    weather_stats = get_weather_for_location(lat, lng)
+    if weather_stats:
+        return jsonify(weather_stats)
+    return jsonify({"error": "Weather data unavailable"}), 404
 
 @app.route('/search_plot/<path:filename>')
 def serve_plot(filename):
