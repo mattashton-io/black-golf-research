@@ -51,11 +51,18 @@ def enrich_course_details(course_name, address):
             elif "```" in text:
                 text = text.split("```")[-1].split("```")[0].strip()
             
-            # Simple heuristic to find JSON object if mixed with text
+            # Robust heuristic to find the first balanced JSON object
             start = text.find('{')
-            end = text.rfind('}')
-            if start != -1 and end != -1:
-                text = text[start:end+1]
+            if start != -1:
+                brace_count = 0
+                for i in range(start, len(text)):
+                    if text[i] == '{':
+                        brace_count += 1
+                    elif text[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            text = text[start:i+1]
+                            break
                 
             data = json.loads(text)
             return data
