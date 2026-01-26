@@ -4,11 +4,15 @@
 - 
 
 ## Proposed Tasks
-- [] After search results are returned, allow user to click on a course in the list to see more information about that course, including:
-    - [] (NOT LOADING) A demographic breakdown of the census tract the course is in (e.g. % Black, % White, % Hispanic, % Asian, etc.) ideally a pie chart.
-- [] weathernext2 query is not working as expected and/or taking too long to load. REVIEW temp-integration.py for reference on how to query weathernext2. DO NOT use hard-coded lat and lng values; ensure polygon is small to optimize query time.
+- [] Create loading animation for the "View Details" modal while the website, phone, and weather data is being retrieved.
+- [] Cache website, phone, and weather data in the zip code cache for golf courses.
+- [] Use gemini-2.5-flash-lite as the model for the agent that finds the telephone and website for each golf course.
+- [] test_agent.py agent should test ALL Zip Codes, not just 5 static ones.
 
 ## Permanent Tasks
 - Ensure libraries and code comply with spec.md and persona.md
 - Update "Current Status" section of this document as needed
 - Update README.md with a summary of the project and instructions on how to run it as needed.
+
+## Future Tasks (DO NOT ATTEMPT YET)
+- Add an agent that can automate the process of updating this task.md file with a summary of changes made and any issues it finds while testing the site. 

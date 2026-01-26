@@ -32,6 +32,23 @@
         
         body { background-color: var(--bg-body); color: var(--text-main); transition: background-color 0.3s, color 0.3s; }
         .bg-card { background-color: var(--bg-card); border-color: var(--border-color); }
+
+        /* Loading Animation */
+        .loading-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            background-color: rgba(0,0,0,0.05);
+            border-radius: 4px;
+            color: transparent !important;
+            min-width: 60px;
+            display: inline-block;
+        }
+        body.dark .loading-pulse {
+            background-color: rgba(255,255,255,0.05);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
     </style>
 </head>
 <body class="font-sans">
@@ -128,26 +145,43 @@
                     <a id="modalWebsite" href="#" target="_blank"
                         class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
                 </div>
-                <div class="mt-6 p-4 rounded bg-gray-50 dark:bg-gray-800 border bgr-teal-border">
-                    <div class="flex items-center justify-between border-b pb-2 mb-2">
-                        <span class="text-sm font-bold uppercase">Current Weather</span>
+                <div class="mt-6 p-4 rounded bg-gray-100 dark:bg-gray-900 border bgr-teal-border">
+                    <div class="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2 mb-2">
+                        <span class="text-sm font-bold uppercase text-gray-700 dark:text-gray-300">Current Weather</span>
                         <span id="modalWeather" class="text-lg font-bold bgr-teal-text">Loading...</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                            <span class="text-gray-500">Wind:</span>
-                            <span id="modalWind" class="font-bold">N/A</span>
+                    <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-500 dark:text-gray-400 font-medium">Feels Like:</span>
+                            <span id="modalFeelsLike" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
-                        <div>
-                            <span class="text-gray-500">Precip (6h):</span>
-                            <span id="modalPrecip" class="font-bold">N/A</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-500 dark:text-gray-400 font-medium">Humidity:</span>
+                            <span id="modalHumidity" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
-                        <div>
-                            <span class="text-gray-500">Humidity:</span>
-                            <span id="modalHumidity" class="font-bold">N/A</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-500 dark:text-gray-400 font-medium">Wind:</span>
+                            <div class="flex items-center">
+                                <span id="modalWind" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
+                                <div id="windArrow" class="ml-1 flex items-center hidden">
+                                    <svg id="windArrowSvg" class="w-4 h-4 text-teal-500 transform transition-transform duration-500" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 19V5m0 0l-7 7m7-7l7 7">
+                                        </path>
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <p class="text-[9px] text-gray-400 mt-2 italic text-right">Source: WeatherNext BigQuery</p>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-500 dark:text-gray-400 font-medium">Precip (6h):</span>
+                            <span id="modalPrecip" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-500 dark:text-gray-400 font-medium">Median Income:</span>
+                            <span id="modalIncome" class="font-bold text-teal-600 dark:text-teal-400">N/A</span>
+                        </div>
+                        </div>
+                        <p class="text-[9px] text-gray-400 dark:text-gray-500 mt-3 italic text-right">Source: WeatherNext & Maps API</p>
                 </div>
             </div>
             <div>
@@ -167,6 +201,7 @@
         let map;
         let markers = [];
             let currentCourses = {};
+                    let currentZipCode = null;
             let demographicChart = null;
 
         function initMap() {
@@ -209,6 +244,7 @@
                     alert(data.error);
                 } else {
                     currentCourses = {};
+                    currentZipCode = zip;
                     data.courses.forEach(c => currentCourses[c.place_id] = c);
                     updateUI(data);
                 }
@@ -292,23 +328,41 @@
 
             async function showCourseDetails(placeId) {
                 const course = currentCourses[placeId];
+
                 if (!course) return;
 
+                // Update Chart                                  
+                updateDemographicChart(course);
+                
                 document.getElementById("modalName").innerText = course.name;
-                document.getElementById("modalAddress").innerText = course.formatted_address || course.vicinity || 'N/A';
-                document.getElementById("modalPhone").innerText = course.formatted_phone_number || 'N/A';
+                document.getElementById("modalAddress").innerText = course.formatted_address || course.vicinity || '-';
 
+                // Reset fields to loading state
+                const fieldsToReset = ["modalPhone", "modalWebsite", "modalWeather", "modalFeelsLike", "modalWind", "modalPrecip", "modalHumidity", "modalIncome"];
+                fieldsToReset.forEach(id => {
+                    const el = document.getElementById(id);
+                    el.innerText = "-";
+                    el.classList.add("loading-pulse");
+                });
+                
                 const website = document.getElementById("modalWebsite");
+                website.href = "#";
+
+                document.getElementById("windArrow").classList.add("hidden");
+
+                document.getElementById("detailsModal").classList.remove("hidden");
+
+                // Populate existing data if available
+                if (course.formatted_phone_number) {
+                    const el = document.getElementById("modalPhone");
+                    el.innerText = course.formatted_phone_number;
+                    el.classList.remove("loading-pulse");
+                }
                 if (course.website) {
                     website.href = course.website;
                     website.innerText = course.website;
-                    website.classList.remove("hidden");
-                } else {
-                    website.innerText = "N/A";
+                    website.classList.remove("loading-pulse");
                 }
-
-                document.getElementById("modalWeather").innerText = "Loading...";
-                document.getElementById("detailsModal").classList.remove("hidden");
 
                 // Fetch Weather
                 try {
@@ -317,26 +371,88 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             lat: course.geometry.location.lat,
-                            lng: course.geometry.location.lng
+                            lng: course.geometry.location.lng,
+                            place_id: placeId,
+                            zip_code: currentZipCode
                         })
                     });
                     const wData = await wRes.json();
 
                     if (wData.error) {
                         document.getElementById("modalWeather").innerText = "N/A";
+                        ["modalWeather", "modalFeelsLike", "modalWind", "modalPrecip", "modalHumidity"].forEach(id => {
+                            document.getElementById(id).classList.remove("loading-pulse");
+                        });
                     } else {
-                        document.getElementById("modalWeather").innerText = wData.temperature !== null ? `${wData.temperature}°F` : 'N/A';
-                        document.getElementById("modalWind").innerText = wData.wind_speed !== null ? `${wData.wind_speed} mph ${wData.wind_direction}` : 'N/A';
-                        document.getElementById("modalPrecip").innerText = wData.precipitation !== null ? `${wData.precipitation} in` : 'N/A';
-                        document.getElementById("modalHumidity").innerText = wData.humidity !== null ? `${wData.humidity}%` : 'N/A';
+                        const wFields = {
+                            "modalWeather": wData.temperature !== null ? `${wData.temperature}°F` : 'N/A',
+                            "modalFeelsLike": wData.feels_like !== null ? `${wData.feels_like}°F` : 'N/A',
+                            "modalWind": wData.wind_speed !== null ? `${wData.wind_speed} mph ${wData.wind_direction || ''}` : 'N/A',
+                            "modalPrecip": wData.precipitation !== null ? `${wData.precipitation} in` : 'N/A',
+                            "modalHumidity": wData.humidity !== null ? `${wData.humidity}%` : 'N/A'
+                        };
+                        for (const [id, val] of Object.entries(wFields)) {
+                            const el = document.getElementById(id);
+                            el.innerText = val;
+                            el.classList.remove("loading-pulse");
+                        }
+
+                        // Handle Wind Arrow
+                        const arrow = document.getElementById("windArrow");
+                        const arrowSvg = document.getElementById("windArrowSvg");
+                        if (wData.wind_bearing !== null) {
+                            arrow.classList.remove("hidden");
+                            arrowSvg.style.transform = `rotate(${wData.wind_bearing}deg)`;
+                        } else {
+                            arrow.classList.add("hidden");
+                        }
                     }
+
+                    // Update Median Income from course data
+                    document.getElementById("modalIncome").innerText = course.median_income ? `$${course.median_income.toLocaleString()}` : "N/A";
                 } catch (e) {
                     console.error("Weather detection error:", e);
                     document.getElementById("modalWeather").innerText = "Error";
                 }
 
-                // Update Chart
-                updateDemographicChart(course);
+                // Fetch AI Enrichment (Phone/Website)
+                try {
+                    const eRes = await fetch('/enrich_course', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: course.name,
+                            address: course.formatted_address || course.vicinity,
+                            place_id: placeId,
+                            zip_code: currentZipCode
+                        })
+                    });
+                    const eData = await eRes.json();
+                    if (!eData.error) {
+                        if (eData.phone) {
+                            const el = document.getElementById("modalPhone");
+                            el.innerText = eData.phone;
+                        }
+                        if (eData.website) {
+                            const website = document.getElementById("modalWebsite");
+                            website.href = eData.website;
+                            website.innerText = eData.website;
+                        }
+                    }
+                    document.getElementById("modalPhone").classList.remove("loading-pulse");
+                    document.getElementById("modalWebsite").classList.remove("loading-pulse");
+                } catch (e) {
+                    console.error("Enrichment error:", e);
+                    document.getElementById("modalPhone").classList.remove("loading-pulse");
+                    document.getElementById("modalWebsite").classList.remove("loading-pulse");
+                }
+
+                // Update Median Income from course data
+                const incomeEl = document.getElementById("modalIncome");
+                incomeEl.innerText = course.median_income ? `$${course.median_income.toLocaleString()}` : "N/A";
+                incomeEl.classList.remove("loading-pulse");
+
+                
             }
 
             function updateDemographicChart(course) {

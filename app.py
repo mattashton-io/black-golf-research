@@ -1,11 +1,19 @@
 import os
 import pandas as pd
 from flask import Flask, render_template, request, jsonify, send_from_directory
-from maps_golf_lookup import search_golf_courses, MAPS_KEY
+from maps_golf_lookup import (
+    search_golf_courses, 
+    MAPS_KEY, 
+    export_to_gcs, 
+    load_from_gcs, 
+    save_to_zip_cache,
+    update_course_in_cache
+)
 from analysis import generate_plots
 import googlemaps
 from google.cloud import bigquery
 from dotenv import load_dotenv
+from course_agent import enrich_course_details
 
 #loads .env
 load_dotenv()
@@ -23,29 +31,64 @@ from maps_golf_lookup import API_TIMEOUT
 gmaps_client = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
 
 def calculate_wind_info(u, v):
-    """Converts U and V components (m/s) to magnitude (mph) and cardinal direction."""
+    """Converts U and V components (m/s) to magnitude (mph), bearing, and cardinal direction."""
     import math
     if u is None or v is None:
-        return None, "N/A"
+        return None, None, "N/A"
     magnitude = math.sqrt(u**2 + v**2) * 2.23694 # m/s to mph
     # Direction: angle of the vector
     # atan2(u, v) gives the angle in radians from the positive Y axis (North)
-    # We want the direction the wind is COMING FROM for meteorology, but 
-    # WeatherNext U/V usually represents the vector direction (wind blowing TO).
-    # However, for consistency with common dashboards, blowing direction is fine.
-    # Standard: (atan2(u, v) * 180 / pi + 180) % 360
     direction_deg = (math.atan2(u, v) * 180 / math.pi + 180) % 360
     
     cardinals = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     ix = round(direction_deg / (360 / len(cardinals))) % len(cardinals)
-    return round(magnitude, 1), cardinals[ix]
+    return round(magnitude, 1), round(direction_deg, 0), cardinals[ix]
 
 def get_weather_for_location(lat, lng):
-    """Fetches latest weather stats from WeatherNext BigQuery dataset."""
+    """Fetches latest weather stats from WeatherNext BigQuery and Google Maps Weather API."""
+    import requests
+    weather_stats = {
+        "temperature": None,
+        "feels_like": None,
+        "humidity": None,
+        "precipitation": None,
+        "wind_speed": None,
+        "wind_direction": "N/A",
+        "wind_bearing": None
+    }
+
+    # 1. Fetch from Google Maps Weather API (Current humidity and feels-like)
+    try:
+        weather_url = f"https://weather.googleapis.com/v1/currentConditions:lookup"
+        params = {
+            "key": MAPS_KEY,
+            "location.latitude": lat,
+            "location.longitude": lng
+        }
+        w_resp = requests.get(weather_url, params=params, timeout=5)
+        if w_resp.status_code == 200:
+            w_data = w_resp.json()
+            # Save raw weather data for debugging as requested in task.md
+            try:
+                os.makedirs("temp", exist_ok=True)
+                with open("temp/last_weather_call.json", "w") as f:
+                    json.dump(w_data, f, indent=2)
+            except: pass
+
+            if 'relativeHumidity' in w_data:
+                weather_stats['humidity'] = w_data['relativeHumidity']
+            if 'feelsLikeTemperature' in w_data:
+                temp_c = w_data['feelsLikeTemperature'].get('degrees')
+                if temp_c is not None:
+                    weather_stats['feels_like'] = round((temp_c * 9/5) + 32, 0)
+    except Exception as e:
+        print(f"Maps Weather API Error: {e}")
+
+    # 2. Fetch from WeatherNext BigQuery
     try:
         # Create a small bounding box (approx 1km) to optimize spatial join
         delta = 0.01 # ~ ±1km
-        poly_wkt = f"POLYGON(({lng-delta} {lat-delta}, {lng+delta} {lat-delta}, {lng+delta} {lat+delta}, {lng-delta} {lat+delta}, {lng-delta} {lat-delta}))"
+        poly_wkt = f"POLYGON(({lng-delta} {lat-delta}, {lng+delta} {lat-delta}, {lng+delta} {lat-delta}, {lng-delta} {lat+delta}, {lng-delta} {lat-delta}))"
         
         table_id = "pytutoring-dev.weathernext_2.weathernext_2_0_0"
         query = f"""
@@ -68,24 +111,22 @@ def get_weather_for_location(lat, lng):
         results = query_job.result()
         
         for row in results:
-            temp_f = round((row['2m_temperature'] - 273.15) * 9/5 + 32, 0)
-            precip_in = round(row['total_precipitation_6hr'] * 39.37, 2)
+            weather_stats['temperature'] = round((row['2m_temperature'] - 273.15) * 9/5 + 32, 0)
+            weather_stats['precipitation'] = round(row['total_precipitation_6hr'] * 39.37, 2)
             
-            wind_speed, wind_dir = calculate_wind_info(
+            wind_speed, wind_bearing, wind_dir = calculate_wind_info(
                 row['10m_u_component_of_wind'], 
                 row['10m_v_component_of_wind']
             )
+            weather_stats['wind_speed'] = wind_speed
+            weather_stats['wind_bearing'] = wind_bearing
+            weather_stats['wind_direction'] = wind_dir
             
-            return {
-                "temperature": temp_f,
-                "precipitation": precip_in,
-                "wind_speed": wind_speed,
-                "wind_direction": wind_dir,
-                "humidity": None # Placeholder for missing variable
-            }
+            return weather_stats
     except Exception as e:
         print(f"Weather BQ Error: {e}")
-    return None
+    
+    return weather_stats if any(v is not None for v in weather_stats.values()) else None
 
 @app.route('/')
 def index():
@@ -179,8 +220,35 @@ def get_weather():
     
     weather_stats = get_weather_for_location(lat, lng)
     if weather_stats:
+        zip_code = data.get('zip_code') # Optional zip from front-end
+        place_id = data.get('place_id')
+        if zip_code and place_id:
+            update_course_in_cache(zip_code, place_id, {"cached_weather": weather_stats})
         return jsonify(weather_stats)
     return jsonify({"error": "Weather data unavailable"}), 404
+
+@app.route('/enrich_course', methods=['POST'])
+def enrich_course():
+    data = request.json
+    name = data.get('name')
+    address = data.get('address')
+    place_id = data.get('place_id')
+    zip_code = data.get('zip_code')
+    
+    if not name or not address:
+        return jsonify({"error": "Missing name or address"}), 400
+    
+    enrichment = enrich_course_details(name, address)
+    
+    # Cache enrichment results if metadata provided
+    if zip_code and place_id:
+        updates = {}
+        if enrichment.get('phone'): updates['formatted_phone_number'] = enrichment['phone']
+        if enrichment.get('website'): updates['website'] = enrichment['website']
+        if updates:
+            update_course_in_cache(zip_code, place_id, updates)
+            
+    return jsonify(enrichment)
 
 @app.route('/search_plot/<path:filename>')
 def serve_plot(filename):

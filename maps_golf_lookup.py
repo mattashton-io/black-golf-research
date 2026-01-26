@@ -86,6 +86,27 @@ def save_to_zip_cache(zip_code, data_to_cache):
     except Exception as e:
         print(f"Error caching for zip {zip_code}: {e}")
 
+def update_course_in_cache(zip_code, place_id, updates):
+    """Updates specific fields for a course in the zip-specific cache."""
+    try:
+        data = load_from_gcs(zip_code)
+        if not data or "courses" not in data:
+            return
+        
+        # In zip_cache, it's a list under 'courses'
+        updated = False
+        for course in data["courses"]:
+            if course.get("place_id") == place_id:
+                for key, val in updates.items():
+                    course[key] = val
+                updated = True
+                break
+        
+        if updated:
+            save_to_zip_cache(zip_code, data)
+    except Exception as e:
+        print(f"Error updating cache for {place_id} in {zip_code}: {e}")
+
 def get_census_tract(lat, lng):
     """Convert Lat/Lng to Census Tract GEOID using Census Geocoder."""
     url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x={lng}&y={lat}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
@@ -111,64 +132,54 @@ def get_census_tract(lat, lng):
         return None
 
 def get_demographics(state, county, tract):
-    """Fetch ACS 5-Year estimates for a specific tract."""
-    base_url = "https://api.census.gov/data/2022/acs/acs5"
-    params = {
-        "get": "NAME,B01003_001E,B02001_003E,B02001_002E,B03001_003E,B02001_005E,B02001_004E,B02001_006E", # Total, Black, White, Hispanic, Asian, Native American, Pacific Islander
-        "for": f"tract:{tract}",
-        "in": f"state:{state} county:{county}",
-        "key": CENSUS_KEY
-    }
-    try:
-        response = requests.get(base_url, params=params, timeout=API_TIMEOUT)
-        
-        if response.status_code == 503:
-            print("Census API 503: Service Unavailable")
-            return None
-            
-        response.raise_for_status()
-        
-        # Check for JSON content
-        if "application/json" not in response.headers.get("Content-Type", ""):
-            print(f"Census API returned non-JSON: {response.text[:100]}")
-            return None
-            
-        data = response.json()
-        
-        # Check if data exists in the response
-        if len(data) < 2:
-            print(f"No demographic data returned for tract {tract}")
-            return None
-            
-        # Mapping indices based on "get" params
-        # 0: NAME, 1: Total, 2: Black, 3: White, 4: Hispanic, 5: Asian, 6: NativeAmerican, 7: PacificIslander
-        total_pop = int(data[1][1])
-        black_pop = int(data[1][2])
-        white_pop = int(data[1][3])
-        hispanic_pop = int(data[1][4])
-        asian_pop = int(data[1][5])
-        native_pop = int(data[1][6])
-        pacific_pop = int(data[1][7])
-        
-        def calc_pct(val, total):
-            return round((val / total) * 100, 2) if total > 0 else 0
-
-        # Plurality check
-        is_plurality_black = (black_pop > white_pop) and (black_pop > hispanic_pop)
-        
-        return {
-            "total_pop": total_pop,
-            "pct_black": calc_pct(black_pop, total_pop), 
-            "pct_white": calc_pct(white_pop, total_pop),
-            "pct_hispanic": calc_pct(hispanic_pop, total_pop),
-            "pct_asian": calc_pct(asian_pop, total_pop),
-            "pct_native": calc_pct(native_pop, total_pop),
-            "pct_pacific": calc_pct(pacific_pop, total_pop),
-            "is_plurality_black": is_plurality_black
-        }
-    except Exception as e:
-        print(f"Error getting demographics: {e}")
-        return None
+    """Fetch ACS estimates for a specific tract, attempting 2024 ACS1 first, then falling back to 2022 ACS5."""
+    # B01003_001E: Total, B02001_003E: Black, B02001_002E: White, B03001_003E: Hispanic, 
+    # B02001_005E: Asian, B02001_004E: Native, B02001_006E: Pacific, B19013_001E: Median Income
+    vars = "NAME,B01003_001E,B02001_003E,B02001_002E,B03001_003E,B02001_005E,B02001_004E,B02001_006E,B19013_001E"
+    
+    configs = [
+        ("2024", "acs/acs1"),
+        ("2023", "acs/acs5"),
+        ("2022", "acs/acs5")
+    ]
+    
+    for year, dataset in configs:
+        base_url = f"https://api.census.gov/data/{year}/{dataset}"
+        params = { "get": vars, "for": f"tract:{tract}", "in": f"state:{state} county:{county}", "key": CENSUS_KEY }
+        try:
+            response = requests.get(base_url, params=params, timeout=API_TIMEOUT)
+            if response.status_code == 200:
+                data = response.json()
+                if len(data) > 1:
+                    # 0:NAME, 1:Total, 2:Black, 3:White, 4:Hispanic, 5:Asian, 6:Native, 7:Pacific, 8:Income
+                    row = data[1]
+                    total_pop = int(row[1]) if row[1] else 0
+                    
+                    def safe_int(val): return int(val) if val and val != "-666666666" else 0
+                    
+                    black_pop = safe_int(row[2])
+                    white_pop = safe_int(row[3])
+                    hispanic_pop = safe_int(row[4])
+                    median_income = safe_int(row[8])
+                    
+                    def calc_pct(val, total): return round((val / total) * 100, 2) if total > 0 else 0
+                    
+                    return {
+                        "year_source": year,
+                        "total_pop": total_pop,
+                        "median_income": median_income,
+                        "pct_black": calc_pct(black_pop, total_pop), 
+                        "pct_white": calc_pct(white_pop, total_pop),
+                        "pct_hispanic": calc_pct(hispanic_pop, total_pop),
+                        "pct_asian": calc_pct(safe_int(row[5]), total_pop),
+                        "pct_native": calc_pct(safe_int(row[6]), total_pop),
+                        "pct_pacific": calc_pct(safe_int(row[7]), total_pop),
+                        "is_plurality_black": (black_pop > white_pop) and (black_pop > hispanic_pop)
+                    }
+        except Exception as e:
+            print(f"Census Error ({year} {dataset}): {e}")
+            continue
+    return None
 
 def is_in_holc_redlined_zone(lat, lng):
     """
@@ -249,6 +260,7 @@ def enrich_course_with_demographics(place):
                 place['pct_native'] = stats['pct_native']
                 place['pct_pacific'] = stats['pct_pacific']
                 place['total_pop'] = stats['total_pop']
+                place['median_income'] = stats.get('median_income')
                 place['is_plurality_black'] = stats.get('is_plurality_black', False)
                 place['is_holc_redlined'] = is_in_holc_redlined_zone(lat, lng)
                 
