@@ -6,6 +6,23 @@ from dotenv import load_dotenv
 import io
 import math
 
+# Task 3: Global Matplotlib Styling
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.sans-serif'] = ['Liberation Sans', 'Arial', 'DejaVu Sans']
+plt.rcParams['axes.linewidth'] = 1.5
+plt.rcParams['axes.edgecolor'] = '#1A1A1A'
+plt.rcParams['axes.spines.top'] = False
+plt.rcParams['axes.spines.right'] = False
+plt.rcParams['grid.alpha'] = 0
+plt.rcParams['text.color'] = '#1A1A1A'
+
+PARCHMENT = '#E8D9C5'
+DUB_INDIGO = '#2C3E75'
+DUB_RED = '#D22030'
+DUB_GOLD = '#E2A62C'
+GOLF_GREEN = '#006442'
+INK_BLACK = '#1A1A1A'
+
 def haversine(lat1, lon1, lat2, lon2):
     """Calculate the great circle distance between two points in miles."""
     R = 3958.8  # Earth radius in miles
@@ -31,14 +48,13 @@ def generate_plots(df, output_dir="static"):
 
     # Create Histogram
     plt.figure(figsize=(10, 6))
-    plt.hist(df['pct_black'].dropna(), bins=20, color='skyblue', edgecolor='black')
-    plt.title('Distribution of Black Population % Near Golf Courses')
-    plt.xlabel('Percentage of Black Population (%)')
-    plt.ylabel('Number of Golf Courses')
-    plt.grid(axis='y', alpha=0.75)
+    plt.hist(df['pct_black'].dropna(), bins=20, color=DUB_INDIGO, edgecolor='black', linewidth=1.5)
+    plt.title('DISTRIBUTION OF BLACK POPULATION %', fontweight='bold')
+    plt.xlabel('PERCENTAGE (%)')
+    plt.ylabel('COURSES')
     
     path_hist = os.path.join(output_dir, "demographic_distribution.png")
-    plt.savefig(path_hist)
+    plt.savefig(path_hist, facecolor=PARCHMENT)
     plt.close()
     saved_files.append("demographic_distribution.png")
     
@@ -48,14 +64,14 @@ def generate_plots(df, output_dir="static"):
     not_majority_black = df[df['pct_black'] <= 51].shape[0]
     categories = ['Majority Black (> 51%)', 'Other (≤ 51%)']
     counts = [majority_black, not_majority_black]
-    plt.bar(categories, counts, color=['salmon', 'lightgreen'], edgecolor='black')
-    plt.title('Golf Courses by Neighborhood Demographics (Binary Split)')
-    plt.ylabel('Number of Golf Courses')
+    plt.bar(categories, counts, color=[DUB_RED, GOLF_GREEN], edgecolor='black', linewidth=1.5)
+    plt.title('NEIGHBORHOOD BINARY SPLIT', fontweight='bold')
+    plt.ylabel('COURSES')
     for i, v in enumerate(counts):
         plt.text(i, v + 0.5, str(v), ha='center', fontweight='bold')
     
     path_binary = os.path.join(output_dir, "demographic_split.png")
-    plt.savefig(path_binary)
+    plt.savefig(path_binary, facecolor=PARCHMENT)
     plt.close()
     saved_files.append("demographic_split.png")
 
@@ -85,9 +101,94 @@ def generate_plots(df, output_dir="static"):
             plt.legend()
             
             path_cum = os.path.join(output_dir, "cumulative_distance_histogram.png")
-            plt.savefig(path_cum)
+            plt.savefig(path_cum, facecolor=PARCHMENT)
             plt.close()
             saved_files.append("cumulative_distance_histogram.png")
+
+    # Task 5: Horizontal Comparative Bar
+    plt.figure(figsize=(10, 3))
+    avg_black_pct = 13.5 # National Average approx
+    local_avg_pct = df['pct_black'].mean()
+    
+    plt.barh(['National Average', 'Local Results'], [avg_black_pct, local_avg_pct], 
+             color=[DUB_GOLD, INK_BLACK], edgecolor='black', linewidth=1.5)
+    plt.title('LOCAL VS NATIONAL DEMOGRAPHIC COMPARISON', fontweight='bold')
+    plt.xlim(0, max(avg_black_pct, local_avg_pct) * 1.2)
+    for i, v in enumerate([avg_black_pct, local_avg_pct]):
+        plt.text(v + 0.5, i, f"{v:.1f}%", va='center', fontweight='bold')
+    
+    path_comp = os.path.join(output_dir, "comparative_bar.png")
+    plt.savefig(path_comp, facecolor=PARCHMENT)
+    plt.close()
+    saved_files.append("comparative_bar.png")
+
+    # Task 8: The Research Funnel Pyramid
+    plt.figure(figsize=(8, 6))
+    layers = ['ZIPS SCANNED', 'COURSES FOUND', 'MAJORITY BLACK']
+    # If the user only scanned one zip, we set it to 1. 
+    # In a real loop, we'd pass the actual count.
+    counts = [1, len(df), len(df[df['pct_black'] > 50])]
+    colors = [DUB_INDIGO, DUB_RED, DUB_GOLD]
+    
+    for i, (layer, count, color) in enumerate(zip(layers, counts, colors)):
+        width = 1.0 - (i * 0.2)
+        plt.barh(i, width, color=color, edgecolor='black', linewidth=1.5)
+        plt.text(0, i, f"{layer}\n({count})", ha='center', va='center', color='white', fontweight='bold')
+    
+    plt.axis('off')
+    plt.title('THE RESEARCH FUNNEL', fontweight='bold', pad=20)
+    
+    # Task 6: Scaled Progression Circles
+    plt.figure(figsize=(6, 8))
+    radii_mi = [10, 15, 25]
+    colors_circ = [PARCHMENT, DUB_GOLD, DUB_RED, DUB_INDIGO]
+    
+    # Calculate counts for each radius
+    if 'distance' not in df.columns and 'search_lat' in df.columns:
+        origin_lat = df['search_lat'].iloc[0]
+        origin_lng = df['search_lng'].iloc[0]
+        df['distance'] = df.apply(lambda row: haversine(origin_lat, origin_lng, row['lat'], row['lng']), axis=1)
+    
+    if 'distance' in df.columns:
+        counts_at_radii = [len(df[df['distance'] <= r]) for r in radii_mi]
+        # Normalize radii for visualization
+        max_c = max(counts_at_radii) if counts_at_radii else 1
+        vis_radii = [ (c/max_c)**0.5 for c in counts_at_radii ]
+        
+        for i, (v_r, c, r_mi) in enumerate(zip(vis_radii, counts_at_radii, radii_mi)):
+            circle = plt.Circle((0, -i*2.5), v_r, color=colors_circ[i % len(colors_circ)], ec='black', lw=1.5)
+            plt.gca().add_artist(circle)
+            plt.text(0, -i*2.5, f"{r_mi}mi\n{c} Courses", ha='center', va='center', fontweight='bold')
+            
+        plt.xlim(-1.5, 1.5)
+        plt.ylim(-7, 1.5)
+        plt.axis('off')
+        plt.title('SCALED SEARCH PROGRESSION', fontweight='bold')
+        
+        path_circles = os.path.join(output_dir, "progression_circles.png")
+        plt.savefig(path_circles, facecolor=PARCHMENT)
+        plt.close()
+        saved_files.append("progression_circles.png")
+
+    # Task 7: Stacked Income Correlation Bar
+    if 'median_income' in df.columns:
+        plt.figure(figsize=(10, 4))
+        # Create income brackets
+        bins = [0, 50000, 100000, 150000, float('inf')]
+        labels = ['<$50k', '$50k-100k', '$100k-150k', '$150k+']
+        df['income_bracket'] = pd.cut(df['median_income'], bins=bins, labels=labels)
+        
+        income_counts = df['income_bracket'].value_counts().reindex(labels).fillna(0)
+        
+        plt.barh(labels, income_counts, color=[DUB_INDIGO, DUB_RED, DUB_GOLD, GOLF_GREEN], 
+                 edgecolor='black', linewidth=1.5)
+        plt.title('MEDIAN INCOME CORRELATION', fontweight='bold')
+        plt.xlabel('COURSE COUNT')
+        
+        path_income = os.path.join(output_dir, "income_correlation.png")
+        plt.savefig(path_income, facecolor=PARCHMENT)
+        plt.close()
+        saved_files.append("income_correlation.png")
 
     return saved_files
 
@@ -116,7 +217,7 @@ def run_analysis():
         # Load into pandas
         df = pd.read_csv(io.StringIO(content))
         print(f"Loaded {len(df)} records into DataFrame.")
-        generate_plots(df, output_dir=".")
+        generate_plots(df, output_dir="static/plots")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 

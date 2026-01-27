@@ -4,10 +4,13 @@
 - 
 
 ## Proposed Tasks
-- [] Create loading animation for the "View Details" modal while the website, phone, and weather data is being retrieved.
-- [] Cache website, phone, and weather data in the zip code cache for golf courses.
-- [] Use gemini-2.5-flash-lite as the model for the agent that finds the telephone and website for each golf course.
-- [] test_agent.py agent should test ALL Zip Codes, not just 5 static ones.
+
+- [ ] Labels in View Details are too small and hard to read (e.g. Feels Like, Wind, Humidity,Precipitation values are white text on a very light background). Labels in View Details should be a heavier font weight and a darker color compared to the values that they are labeling.
+- [ ] font sizes for visualizations are too small
+- [ ] better contrast for black text on dark backgrounds, try white text with black outline. REFERENCE temp/totals-pyramid-chart.jpg
+- [ ] binary split chart: show binary + plurality REFERENCE temp/percentage-histogram.jpg
+- [ ] wind arrow color should match color palette (try blue in light mode and gold in dark mode)
+
 
 ## Permanent Tasks
 - Ensure libraries and code comply with spec.md and persona.md

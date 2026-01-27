@@ -8,13 +8,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bgr-teal: #099268;
-            --bgr-teal-dark: #087f5b;
-            --bgr-dark: #212529;
-            --bg-body: #f8f9fa;
-            --bg-card: #ffffff;
-            --text-main: #212529;
-            --border-color: #dee2e6;
+            --parchment: #E8D9C5;
+            --golf-green: #006442;
+            --dubois-red: #D22030;
+            --dubois-indigo: #2C3E75;
+            --dubois-gold: #E2A62C;
+            --ink-black: #1A1A1A;
+            
+            --bg-body: var(--parchment);
+            --bg-card: var(--parchment);
+            --text-main: var(--ink-black);
+            --border-color: var(--dubois-indigo);
+            --bgr-teal: var(--golf-green);
         }
 
         body.dark {
@@ -22,7 +27,7 @@
             --bg-card: #25262b;
             --text-main: #ced4da;
             --border-color: #373a40;
-            --bgr-dark: #101113;
+            --bgr-teal: #087f5b;
         }
 
         .bgr-teal-bg { background-color: var(--bgr-teal); }
@@ -30,8 +35,10 @@
         .bgr-teal-text { color: var(--bgr-teal); }
         .bgr-teal-border { border-color: var(--bgr-teal); }
         
-        body { background-color: var(--bg-body); color: var(--text-main); transition: background-color 0.3s, color 0.3s; }
-        .bg-card { background-color: var(--bg-card); border-color: var(--border-color); }
+        body { background-color: var(--bg-body); color: var(--text-main); transition: background-color 0.3s, color 0.3s; font-family: 'Inter', sans-serif; }
+        .bg-card { background-color: var(--bg-card); border-color: var(--border-color); border-width: 1px; }
+        
+        h1, h2, h3, h4 { text-transform: uppercase; font-family: sans-serif; }
 
         /* Loading Animation */
         .loading-pulse {
@@ -53,9 +60,9 @@
 </head>
 <body class="font-sans">
     <!-- Header -->
-    <header class="bgr-dark-bg text-white p-6 shadow-lg border-b-4 bgr-teal-border">
+    <header class="bg-card text-main p-6 shadow-lg border-b-4" style="border-color: var(--dubois-red);">
         <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <h1 class="text-3xl font-bold tracking-tight">BLACK GOLF <span class="bgr-teal-text">RESEARCH</span></h1>
+            <h1 class="text-3xl font-bold tracking-tight">BLACK GOLF <span style="color: var(--dubois-red);">RESEARCH</span></h1>
             <div class="flex items-center space-x-4">
                 <button onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-gray-700 transition" title="Toggle Dark Mode">
                     <svg id="darkIcon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20">
@@ -89,7 +96,7 @@
                             <span>Auto-Expand</span>
                         </label>
                         <button onclick="performSearch()" id="searchBtn"
-                            class="bgr-teal-bg hover:bg-green-700 text-white font-bold py-2 px-6 rounded transition duration-200">
+                            class="hover:opacity-90 text-white font-bold py-2 px-6 rounded transition duration-200" style="background-color: var(--dubois-indigo);">
                             SEARCH
                         </button>
                     </div>
@@ -102,14 +109,16 @@
         <!-- Dashboard Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <!-- Map Container -->
-            <div class="bg-card p-4 rounded-lg shadow-md border-t-4 bgr-teal-border h-[500px]">
-                <h2 class="text-xl font-bold mb-4 bgr-dark-bg text-white p-2 rounded">Course Geographic Distribution</h2>
+            <div class="bg-card p-4 rounded-lg shadow-md border-t-4 h-[500px]" style="border-color: var(--dubois-indigo);">
+                <h2 class="text-xl font-bold mb-4 p-2 rounded" style="background-color: var(--dubois-indigo); color: white;">Course
+                    Geographic Distribution</h2>
                 <div id="map" class="w-full h-[400px] rounded border border-gray-300"></div>
             </div>
 
             <!-- Plots Carousel Area -->
-            <div class="bg-card p-4 rounded-lg shadow-md border-t-4 bgr-teal-border">
-                <h2 class="text-xl font-bold mb-4 bgr-dark-bg text-white p-2 rounded">Demographic Insights</h2>
+            <div class="bg-card p-4 rounded-lg shadow-md border-t-4" style="border-color: var(--dubois-indigo);">
+                <h2 class="text-xl font-bold mb-4 p-2 rounded" style="background-color: var(--dubois-indigo); color: white;">
+                    Demographic Insights</h2>
                 <div id="plotsContainer" class="flex flex-col space-y-4 overflow-y-auto max-h-[420px]">
                     <p class="text-gray-500 italic">Enter a zip code to see analysis plots.</p>
                 </div>
@@ -117,38 +126,40 @@
         </div>
 
         <!-- Course List -->
-        <div class="bg-card p-6 rounded-lg shadow-md border-l-8 bgr-teal-border text-left">
-            <h2 class="text-2xl font-bold mb-4 bgr-dark-bg text-white p-2 rounded inline-block">Discovered Courses</h2>
+        <div class="bg-card p-6 rounded-lg shadow-md border-l-8 text-left" style="border-color: var(--dubois-red);">
+            <h2 class="text-2xl font-bold mb-4 p-2 rounded inline-block"
+                style="background-color: var(--dubois-red); color: white;">Discovered Courses</h2>
             <div id="courseList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <p class="text-gray-500">Nearby courses will appear here.</p>
             </div>
         </div>
 <!-- Details Modal -->
 <div id="detailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-    <div class="bg-card w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden border-2 bgr-teal-border">
-        <div class="bgr-dark-bg p-4 text-white flex justify-between items-center">
+    <div class="bg-card w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden border-2"
+        style="border-color: var(--dubois-red);">
+        <div class="p-4 text-white flex justify-between items-center" style="background-color: var(--dubois-red);">
             <h2 id="modalName" class="text-xl font-bold">Course Details</h2>
             <button onclick="closeModal()" class="text-2xl hover:text-gray-300">&times;</button>
         </div>
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
             <div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-400">Address</label>
-                    <p id="modalAddress" class="text-sm italic">N/A</p>
+                    <label class="text-[10px] uppercase font-bold text-gray-500">Address</label>
+                    <p id="modalAddress" class="text-sm font-bold" style="color: var(--ink-black);">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-400">Phone</label>
-                    <p id="modalPhone" class="text-sm">N/A</p>
+                    <label class="text-[10px] uppercase font-bold text-gray-500">Phone</label>
+                    <p id="modalPhone" class="text-sm font-bold" style="color: var(--ink-black);">N/A</p>
                 </div>
                 <div class="mb-4">
                     <label class="text-[10px] uppercase font-bold text-gray-400">Website</label>
                     <a id="modalWebsite" href="#" target="_blank"
                         class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
                 </div>
-                <div class="mt-6 p-4 rounded bg-gray-100 dark:bg-gray-900 border bgr-teal-border">
+                <div class="mt-6 p-4 rounded bg-white/30 border" style="border-color: var(--dubois-indigo);">
                     <div class="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2 mb-2">
                         <span class="text-sm font-bold uppercase text-gray-700 dark:text-gray-300">Current Weather</span>
-                        <span id="modalWeather" class="text-lg font-bold bgr-teal-text">Loading...</span>
+                        <span id="modalWeather" class="text-lg font-bold" style="color: var(--golf-green);">Loading...</span>
                     </div>
                     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                         <div class="flex items-center space-x-2">
@@ -177,8 +188,8 @@
                             <span id="modalPrecip" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Median Income:</span>
-                            <span id="modalIncome" class="font-bold text-teal-600 dark:text-teal-400">N/A</span>
+                            <span class="text-gray-700 font-bold">Median Income:</span>
+                            <span id="modalIncome" class="font-bold text-xl" style="color: var(--dubois-indigo);">N/A</span>
                         </div>
                         </div>
                         <p class="text-[9px] text-gray-400 dark:text-gray-500 mt-3 italic text-right">Source: WeatherNext & Maps API</p>
@@ -313,7 +324,7 @@
                             <span>${course.pct_black || 0}% Black Pop</span>
                             <span class="bg-card text-main border border-gray-500 px-2 py-0.5 rounded">Pop: ${course.total_pop || 0}</span>
                         </div>
-                        <button onclick="showCourseDetails('${course.place_id}')" class="w-full py-1 text-xs font-bold uppercase border bgr-teal-border bgr-teal-text hover:bg-teal-500 hover:text-white transition">
+                        <button onclick="showCourseDetails('${course.place_id}')" class="w-full py-1 text-xs font-bold uppercase border transition" style="border-color: var(--golf-green); color: var(--golf-green);">
                             View Details
                         </button>
                     </div>
@@ -488,12 +499,12 @@
                     datasets: [{
                         data: demoData,
                         backgroundColor: [
-                            '#099268', // Teal
-                            '#339af0', // Blue
-                            '#fab005', // Yellow
-                            '#be4bdb', // Grape
-                            '#fa5252', // Red
-                            '#15aabf'  // Cyan
+                            '#006442', // Golf Green
+                            '#2C3E75', // Du Bois Indigo
+                            '#E2A62C', // Du Bois Gold
+                            '#D22030', // Du Bois Red
+                            '#1A1A1A', // Ink Black
+                            '#E8D9C5'  // Parchment
                         ]
                     }]
                 };
@@ -504,12 +515,31 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        elements: {
+                            arc: {
+                                borderWidth: 2,
+                                borderColor: '#1A1A1A'
+                            }
+                        },
                         plugins: {
                             legend: {
                                 position: 'bottom',
                                 labels: {
                                     boxWidth: 12,
-                                    font: { size: 10 }
+                                    font: { size: 10, weight: 'bold' },
+                                    color: '#1A1A1A',
+                                    generateLabels: function (chart) {
+                                        const original = Chart.overrides.pie.plugins.legend.labels.generateLabels(chart);
+                                        original.forEach(label => label.text = label.text.toUpperCase());
+                                        return original;
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return context.label.toUpperCase() + ': ' + context.raw + '%';
+                                    }
                                 }
                             }
                         }

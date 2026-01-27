@@ -108,10 +108,26 @@ def run_tests(limit=None):
     print(f"Starting tests for {len(zips)} zip codes...")
     all_results = []
     
+    consecutive_errors = 0
+    last_error = None
+    
     for i, z in enumerate(zips):
         print(f"[{i+1}/{len(zips)}] Testing {z}...")
-        all_results.append(test_zip(z))
+        result = test_zip(z)
+        all_results.append(result)
         
+        # Sequential Error Tracking
+        current_error = result["errors"][0] if result["errors"] else None
+        if current_error and current_error == last_error:
+            consecutive_errors += 1
+            if consecutive_errors >= 3:
+                print(f"!!! CRITICAL: Same error encountered 3 times in a row: {current_error}")
+                print("Stopping tests.")
+                break
+        else:
+            consecutive_errors = 1 if current_error else 0
+            last_error = current_error
+
         # Periodic report saving
         if (i + 1) % 10 == 0:
             generate_report(all_results, partial=True)
