@@ -5,8 +5,10 @@ from google.cloud import storage
 from dotenv import load_dotenv
 import io
 import math
+import matplotlib.patheffects as path_effects
 
 # Task 3: Global Matplotlib Styling
+plt.rcParams['font.size'] = 12
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Liberation Sans', 'Arial', 'DejaVu Sans']
 plt.rcParams['axes.linewidth'] = 1.5
@@ -58,17 +60,32 @@ def generate_plots(df, output_dir="static"):
     plt.close()
     saved_files.append("demographic_distribution.png")
     
-    # Create Binary Split Bar Plot (> 51% vs Not)
+    # Create Binary + Plurality Split Bar Plot
     plt.figure(figsize=(8, 6))
-    majority_black = df[df['pct_black'] > 51].shape[0]
-    not_majority_black = df[df['pct_black'] <= 51].shape[0]
-    categories = ['Majority Black (> 51%)', 'Other (≤ 51%)']
-    counts = [majority_black, not_majority_black]
-    plt.bar(categories, counts, color=[DUB_RED, GOLF_GREEN], edgecolor='black', linewidth=1.5)
-    plt.title('NEIGHBORHOOD BINARY SPLIT', fontweight='bold')
+    
+    majority_black = df[df['pct_black'] > 50].shape[0]
+    # Plurality is True AND not Majority (>50)
+    plurality_black = df[
+        (df['is_plurality_black'] == True) & 
+        (df['pct_black'] <= 50)
+    ].shape[0]
+    
+    # Other is everything else
+    other_courses = len(df) - majority_black - plurality_black
+    
+    categories = ['Majority Black', 'Plurality Black', 'Other']
+    counts = [majority_black, plurality_black, other_courses]
+    colors = [DUB_RED, DUB_GOLD, GOLF_GREEN]
+    
+    bars = plt.bar(categories, counts, color=colors, edgecolor='black', linewidth=1.5)
+    plt.title('NEIGHBORHOOD DEMOGRAPHICS', fontweight='bold')
     plt.ylabel('COURSES')
-    for i, v in enumerate(counts):
-        plt.text(i, v + 0.5, str(v), ha='center', fontweight='bold')
+    
+    for bar, count in zip(bars, counts):
+        if count > 0:
+            text = plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5, 
+                            str(count), ha='center', fontweight='bold', color=INK_BLACK)
+            text.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
     path_binary = os.path.join(output_dir, "demographic_split.png")
     plt.savefig(path_binary, facecolor=PARCHMENT)
@@ -133,7 +150,8 @@ def generate_plots(df, output_dir="static"):
     for i, (layer, count, color) in enumerate(zip(layers, counts, colors)):
         width = 1.0 - (i * 0.2)
         plt.barh(i, width, color=color, edgecolor='black', linewidth=1.5)
-        plt.text(0, i, f"{layer}\n({count})", ha='center', va='center', color='white', fontweight='bold')
+        text = plt.text(0, i, f"{layer}\n({count})", ha='center', va='center', color='black', fontweight='bold')
+        text.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
     plt.axis('off')
     plt.title('THE RESEARCH FUNNEL', fontweight='bold', pad=20)

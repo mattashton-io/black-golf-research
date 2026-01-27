@@ -14,6 +14,8 @@
             --dubois-indigo: #2C3E75;
             --dubois-gold: #E2A62C;
             --ink-black: #1A1A1A;
+            --wind-arrow-light: #339af0;
+            --wind-arrow-dark: #E2A62C;
             
             --bg-body: var(--parchment);
             --bg-card: var(--parchment);
@@ -144,39 +146,39 @@
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
             <div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500">Address</label>
+                    <label class="text-[10px] uppercase font-bold text-gray-900">Address</label>
                     <p id="modalAddress" class="text-sm font-bold" style="color: var(--ink-black);">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500">Phone</label>
+                    <label class="text-[10px] uppercase font-bold text-gray-900">Phone</label>
                     <p id="modalPhone" class="text-sm font-bold" style="color: var(--ink-black);">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-400">Website</label>
+                    <label class="text-[10px] uppercase font-bold text-gray-900">Website</label>
                     <a id="modalWebsite" href="#" target="_blank"
                         class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
                 </div>
                 <div class="mt-6 p-4 rounded bg-white/30 border" style="border-color: var(--dubois-indigo);">
                     <div class="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2 mb-2">
-                        <span class="text-sm font-bold uppercase text-gray-700 dark:text-gray-300">Current Weather</span>
+                        <span class="text-sm font-black uppercase text-gray-900 dark:text-gray-100">Current Weather</span>
                         <span id="modalWeather" class="text-lg font-bold" style="color: var(--golf-green);">Loading...</span>
                     </div>
                     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Feels Like:</span>
+                            <span class="text-gray-900 dark:text-gray-200 font-extrabold">Feels Like:</span>
                             <span id="modalFeelsLike" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Humidity:</span>
+                            <span class="text-gray-900 dark:text-gray-200 font-extrabold">Humidity:</span>
                             <span id="modalHumidity" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Wind:</span>
+                            <span class="text-gray-900 dark:text-gray-200 font-extrabold">Wind:</span>
                             <div class="flex items-center">
                                 <span id="modalWind" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                                 <div id="windArrow" class="ml-1 flex items-center hidden">
-                                    <svg id="windArrowSvg" class="w-4 h-4 text-teal-500 transform transition-transform duration-500" fill="none"
-                                        stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg id="windArrowSvg" class="w-4 h-4 transform transition-transform duration-500"
+                                        style="color: var(--wind-arrow-light);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 19V5m0 0l-7 7m7-7l7 7">
                                         </path>
                                     </svg>
@@ -184,11 +186,11 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Precip (6h):</span>
+                            <span class="text-gray-900 dark:text-gray-200 font-extrabold">Precip (6h):</span>
                             <span id="modalPrecip" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-700 font-bold">Median Income:</span>
+                            <span class="text-gray-900 font-extrabold">Median Income:</span>
                             <span id="modalIncome" class="font-bold text-xl" style="color: var(--dubois-indigo);">N/A</span>
                         </div>
                         </div>
@@ -566,6 +568,12 @@
                                 { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c8d7d4" }] }
                             ];
                             map.setOptions({ styles: isDark ? darkStyle : lightStyle });
+                        }
+
+                        // Update wind arrow color
+                        const windArrow = document.getElementById('windArrowSvg');
+                        if (windArrow) {
+                            windArrow.style.color = isDark ? 'var(--wind-arrow-dark)' : 'var(--wind-arrow-light)';
                         }
                     }
 

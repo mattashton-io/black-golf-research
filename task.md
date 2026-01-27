@@ -5,11 +5,11 @@
 
 ## Proposed Tasks
 
-- [ ] Labels in View Details are too small and hard to read (e.g. Feels Like, Wind, Humidity,Precipitation values are white text on a very light background). Labels in View Details should be a heavier font weight and a darker color compared to the values that they are labeling.
-- [ ] font sizes for visualizations are too small
-- [ ] better contrast for black text on dark backgrounds, try white text with black outline. REFERENCE temp/totals-pyramid-chart.jpg
-- [ ] binary split chart: show binary + plurality REFERENCE temp/percentage-histogram.jpg
-- [ ] wind arrow color should match color palette (try blue in light mode and gold in dark mode)
+- [x] Labels in View Details are too small and hard to read (e.g. Feels Like, Wind, Humidity,Precipitation values are white text on a very light background). Labels in View Details should be a heavier font weight and a darker color compared to the values that they are labeling.
+- [x] font sizes for visualizations are too small
+- [x] better contrast for black text on dark backgrounds, try white text with black outline. REFERENCE temp/totals-pyramid-chart.jpg
+- [x] binary split chart: show binary + plurality REFERENCE temp/percentage-histogram.jpg
+- [x] wind arrow color should match color palette (try blue in light mode and gold in dark mode)
 
 
 ## Permanent Tasks
