@@ -1,21 +1,11 @@
 # Development Roadmap: black-golf-research
 
 ## Current Status
-* Fixing broken images when retrieving cached results from GCS.
+* [Finalized] Unique plot filenames and GCS synchronization implemented. Images now serve reliably from GCS cache in stateless environments.
 
 ## Proposed Tasks
-* [ ] **Implement Unique Plot Filenames**  
-  * Logic: Update analysis.py's generate\_plots function to accept zip\_code as an argument.  
-  * Styling: Prefix all generated plot filenames with the zip\_code (e.g., 10001\_demographic\_distribution.png) to prevent collisions and support multi-user caching.  
-* [ ] **Synchronize Plots to GCS**  
-  * Logic: In app.py, after generate\_plots is called in the /search route, upload the resulting .png files from the local static/plots/ directory to the GCS bucket defined by SECRET\_BUCKET.  
-  * Path: Store them under plots/{zip\_code}/ in the bucket.  
-* [ ] **Resilient Plot Serving Route**  
-  * Logic: Refactor the @app.route('/search\_plot/\<path:filename\>') in app.py.  
-  * Behavior: Check if the file exists in the local static/plots/ directory. If missing (common in stateless Cloud Run environments), attempt to download the file from GCS using the SECRET\_BUCKET and the corresponding zip\_code prefix before serving.  
-* [ ] **Update Cache JSON Structure**  
-  * Logic: Ensure the result dictionary saved to save\_to\_zip\_cache contains the full relative path or unique filename for the plots, ensuring the frontend can request the specific unique images.
-
+* [ ] Create a version of the demographic chart image (canvas id=demographicChart) for DARK MODE so Legend text is white and the bars are the colors in the spec.md file. For LIGHT MODE, continue to use the current colors (i.e. Legend text is black).
+* [ ] Everything in <div id="detailsModal"> should be updated to use text-main colors. 
 
 ## Permanent Tasks
 - Ensure libraries and code comply with spec.md and persona.md

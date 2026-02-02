@@ -148,36 +148,36 @@
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
             <div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Address</label>
+                    <label class="text-[10px] uppercase font-bold text-main opacity-60">Address</label>
                     <p id="modalAddress" class="text-sm font-bold text-main">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Phone</label>
+                    <label class="text-[10px] uppercase font-bold text-main opacity-60">Phone</label>
                     <p id="modalPhone" class="text-sm font-bold text-main">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Website</label>
+                    <label class="text-[10px] uppercase font-bold text-main opacity-60">Website</label>
                     <a id="modalWebsite" href="#" target="_blank"
                         class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
                 </div>
                 <div class="mt-6 p-4 rounded bg-white/30 border" style="border-color: var(--dubois-indigo);">
                     <div class="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2 mb-2">
-                        <span class="text-sm font-bold uppercase text-gray-700 dark:text-gray-300">Current Weather</span>
+                        <span class="text-sm font-bold uppercase text-main opacity-80">Current Weather</span>
                         <span id="modalWeather" class="text-lg font-bold" style="color: var(--golf-green);">Loading...</span>
                     </div>
                     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Feels Like:</span>
+                            <span class="text-main opacity-70 font-medium">Feels Like:</span>
                             <span id="modalFeelsLike" class="font-bold text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Humidity:</span>
-                            <span id="modalHumidity" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
+                            <span class="text-main opacity-70 font-medium">Humidity:</span>
+                            <span id="modalHumidity" class="font-bold text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Wind:</span>
+                            <span class="text-main opacity-70 font-medium">Wind:</span>
                             <div class="flex items-center">
-                                <span id="modalWind" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
+                                <span id="modalWind" class="font-bold text-main">N/A</span>
                                 <div id="windArrow" class="ml-1 flex items-center hidden">
                                     <svg id="windArrowSvg" class="w-4 h-4 transform transition-transform duration-500" fill="none"
                                         stroke="currentColor" viewBox="0 0 24 24">
@@ -188,15 +188,15 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-400 font-medium">Precip (6h):</span>
-                            <span id="modalPrecip" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
+                            <span class="text-main opacity-70 font-medium">Precip (6h):</span>
+                            <span id="modalPrecip" class="font-bold text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-500 dark:text-gray-300 font-bold">Median Income:</span>
+                            <span class="text-main opacity-70 font-bold">Median Income:</span>
                             <span id="modalIncome" class="font-bold text-xl" style="color: var(--dubois-indigo);">N/A</span>
                         </div>
                         </div>
-                        <p class="text-[9px] text-gray-400 dark:text-gray-500 mt-3 italic text-right">Source: WeatherNext & Maps API</p>
+                        <p class="text-[9px] text-main opacity-50 mt-3 italic text-right">Source: WeatherNext & Maps API</p>
                 </div>
             </div>
             <div>
@@ -216,8 +216,9 @@
         let map;
         let markers = [];
             let currentCourses = {};
-                    let currentZipCode = null;
+            let currentZipCode = null;
             let demographicChart = null;
+            let lastDetailedCourse = null;
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
@@ -347,6 +348,7 @@
                 if (!course) return;
 
                 // Update Chart                                  
+                lastDetailedCourse = course;
                 updateDemographicChart(course);
                 
                 document.getElementById("modalName").innerText = course.name;
@@ -513,6 +515,10 @@
                     }]
                 };
 
+                const isDark = document.body.classList.contains('dark');
+                const textColor = isDark ? '#FFFFFF' : '#1A1A1A';
+                const chartBorderColor = isDark ? '#25262b' : '#1A1A1A';
+
                 demographicChart = new Chart(ctx, {
                     type: 'pie',
                     data: data,
@@ -522,7 +528,7 @@
                         elements: {
                             arc: {
                                 borderWidth: 2,
-                                borderColor: '#1A1A1A'
+                                borderColor: chartBorderColor
                             }
                         },
                         plugins: {
@@ -531,7 +537,7 @@
                                 labels: {
                                     boxWidth: 12,
                                     font: { size: 10, weight: 'bold' },
-                                    color: '#1A1A1A',
+                                    color: textColor,
                                     generateLabels: function (chart) {
                                         const original = Chart.overrides.pie.plugins.legend.labels.generateLabels(chart);
                                         original.forEach(label => label.text = label.text.toUpperCase());
@@ -570,6 +576,11 @@
                                 { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c8d7d4" }] }
                             ];
                             map.setOptions({ styles: isDark ? darkStyle : lightStyle });
+                        }
+
+                        // Re-render chart if modal is open to update legend color
+                        if (!document.getElementById("detailsModal").classList.contains("hidden") && lastDetailedCourse) {
+                            updateDemographicChart(lastDetailedCourse);
                         }
                     }
 

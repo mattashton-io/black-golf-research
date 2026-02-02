@@ -33,7 +33,7 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2)**2
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-def generate_plots(df, output_dir="static"):
+def generate_plots(df, output_dir="static", zip_code=None):
     """
     Generates demographic analysis plots from a DataFrame and saves them to output_dir.
     Returns a list of saved filenames.
@@ -42,6 +42,7 @@ def generate_plots(df, output_dir="static"):
         os.makedirs(output_dir)
 
     saved_files = []
+    prefix = f"{zip_code}_" if zip_code else ""
 
     if 'pct_black' not in df.columns:
         print("Error: 'pct_black' column not found in the DataFrame.")
@@ -54,10 +55,11 @@ def generate_plots(df, output_dir="static"):
     plt.xlabel('PERCENTAGE (%)')
     plt.ylabel('COURSES')
     
-    path_hist = os.path.join(output_dir, "demographic_distribution.png")
+    filename_hist = f"{prefix}demographic_distribution.png"
+    path_hist = os.path.join(output_dir, filename_hist)
     plt.savefig(path_hist, facecolor=PARCHMENT)
     plt.close()
-    saved_files.append("demographic_distribution.png")
+    saved_files.append(filename_hist)
     
     # Create Binary Split Bar Plot (> 50% vs Plurality vs Other)
     plt.figure(figsize=(10, 6))
@@ -81,10 +83,11 @@ def generate_plots(df, output_dir="static"):
     for i, v in enumerate(counts):
         plt.text(i, v + 0.1, str(v), ha='center', fontweight='bold')
     
-    path_binary = os.path.join(output_dir, "demographic_split.png")
+    filename_binary = f"{prefix}demographic_split.png"
+    path_binary = os.path.join(output_dir, filename_binary)
     plt.savefig(path_binary, facecolor=PARCHMENT)
     plt.close()
-    saved_files.append("demographic_split.png")
+    saved_files.append(filename_binary)
 
     # Cumulative Distance Plot
     if 'search_lat' in df.columns and 'search_lng' in df.columns:
@@ -111,10 +114,11 @@ def generate_plots(df, output_dir="static"):
             plt.axvline(x=avg_dist, color='red', linestyle='--', label=f'Avg Distance: {avg_dist:.2f} mi')
             plt.legend()
             
-            path_cum = os.path.join(output_dir, "cumulative_distance_histogram.png")
+            filename_cum = f"{prefix}cumulative_distance_histogram.png"
+            path_cum = os.path.join(output_dir, filename_cum)
             plt.savefig(path_cum, facecolor=PARCHMENT)
             plt.close()
-            saved_files.append("cumulative_distance_histogram.png")
+            saved_files.append(filename_cum)
 
     # Task 5: Horizontal Comparative Bar
     plt.figure(figsize=(10, 3))
@@ -128,10 +132,11 @@ def generate_plots(df, output_dir="static"):
     for i, v in enumerate([avg_black_pct, local_avg_pct]):
         plt.text(v + 0.5, i, f"{v:.1f}%", va='center', fontweight='bold')
     
-    path_comp = os.path.join(output_dir, "comparative_bar.png")
+    filename_comp = f"{prefix}comparative_bar.png"
+    path_comp = os.path.join(output_dir, filename_comp)
     plt.savefig(path_comp, facecolor=PARCHMENT)
     plt.close()
-    saved_files.append("comparative_bar.png")
+    saved_files.append(filename_comp)
 
     # Task 8: The Research Funnel Pyramid
     plt.figure(figsize=(8, 6))
@@ -176,10 +181,11 @@ def generate_plots(df, output_dir="static"):
         plt.axis('off')
         plt.title('SCALED SEARCH PROGRESSION', fontweight='bold')
         
-        path_circles = os.path.join(output_dir, "progression_circles.png")
+        filename_circles = f"{prefix}progression_circles.png"
+        path_circles = os.path.join(output_dir, filename_circles)
         plt.savefig(path_circles, facecolor=PARCHMENT)
         plt.close()
-        saved_files.append("progression_circles.png")
+        saved_files.append(filename_circles)
 
     # Task 7: Stacked Income Correlation Bar
     if 'median_income' in df.columns:
@@ -196,10 +202,11 @@ def generate_plots(df, output_dir="static"):
         plt.title('MEDIAN INCOME CORRELATION', fontweight='bold')
         plt.xlabel('COURSE COUNT')
         
-        path_income = os.path.join(output_dir, "income_correlation.png")
+        filename_income = f"{prefix}income_correlation.png"
+        path_income = os.path.join(output_dir, filename_income)
         plt.savefig(path_income, facecolor=PARCHMENT)
         plt.close()
-        saved_files.append("income_correlation.png")
+        saved_files.append(filename_income)
 
     return saved_files
 

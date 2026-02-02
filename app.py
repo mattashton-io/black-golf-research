@@ -132,6 +132,25 @@ def get_weather_for_location(lat, lng):
 def index():
     return render_template('index.html', maps_key=MAPS_KEY)
 
+def upload_plots_to_gcs(zip_code, plot_files):
+    """Uploads generated plot files to GCS under plots/{zip_code}/."""
+    from google.cloud import storage
+    from maps_golf_lookup import secret_bucket_id
+    
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(secret_bucket_id)
+        
+        for filename in plot_files:
+            local_path = os.path.join("static/plots", filename)
+            if os.path.exists(local_path):
+                # Target path in GCS: plots/{zip_code}/{filename}
+                blob = bucket.blob(f"plots/{zip_code}/{filename}")
+                blob.upload_from_filename(local_path)
+                print(f"Uploaded {filename} to GCS for zip {zip_code}")
+    except Exception as e:
+        print(f"Error uploading plots to GCS for {zip_code}: {e}")
+
 @app.route('/search', methods=['POST'])
 def search():
     data = request.json
@@ -142,15 +161,36 @@ def search():
         return jsonify({"error": "No zip code provided"}), 400
     
     # 0. Check GCS Cache
-    from maps_golf_lookup import load_from_gcs, save_to_zip_cache
+    from maps_golf_lookup import load_from_gcs, save_to_zip_cache, secret_bucket_id
+    from google.cloud import storage
+    
     cached_data = load_from_gcs(zip_code=zip_code)
     if cached_data and isinstance(cached_data, dict):
         # Ensure cached data is complete for frontend and contains NEW demographics
         courses = cached_data.get('courses', [])
         has_new_demographics = courses and 'pct_white' in courses[0]
+        cached_plots = cached_data.get('plots', [])
         
         if all(k in cached_data for k in ['lat', 'lng', 'courses', 'plots']) and has_new_demographics:
-            return jsonify(cached_data)
+            # NEW: Verify that the plots actually exist in GCS
+            try:
+                storage_client = storage.Client()
+                bucket = storage_client.bucket(secret_bucket_id)
+                all_plots_exist = True
+                for plot_filename in cached_plots:
+                    # GCS path: plots/{zip_code}/{filename}
+                    blob = bucket.blob(f"plots/{zip_code}/{plot_filename}")
+                    if not blob.exists():
+                        print(f"Cache Invalidation: Plot {plot_filename} missing from GCS.")
+                        all_plots_exist = False
+                        break
+                
+                if all_plots_exist:
+                    return jsonify(cached_data)
+                else:
+                    print(f"Incomplete plot cache found for {zip_code} in GCS, re-searching.")
+            except Exception as e:
+                print(f"Error validating GCS plot cache: {e}")
         else:
             print(f"Incomplete or stale cache found for {zip_code}, re-searching.")
 
@@ -196,7 +236,10 @@ def search():
     df = pd.DataFrame(df_data)
     
     # 4. Generate plots
-    plot_files = generate_plots(df, output_dir="static/plots")
+    plot_files = generate_plots(df, output_dir="static/plots", zip_code=zip_code)
+    
+    # Synchronize plots to GCS
+    upload_plots_to_gcs(zip_code, plot_files)
     
     result = {
         "lat": lat,
@@ -253,6 +296,30 @@ def enrich_course():
 
 @app.route('/search_plot/<path:filename>')
 def serve_plot(filename):
+    """Serves a plot file, downloading it from GCS if not found locally."""
+    local_path = os.path.join('static/plots', filename)
+    
+    if not os.path.exists(local_path):
+        print(f"Plot {filename} not found locally. Attempting GCS download...")
+        # Filename format: {zip_code}_{plot_type}.png
+        try:
+            zip_code = filename.split('_')[0]
+            if zip_code:
+                from google.cloud import storage
+                from maps_golf_lookup import secret_bucket_id
+                storage_client = storage.Client()
+                bucket = storage_client.bucket(secret_bucket_id)
+                # GCS path: plots/{zip_code}/{filename}
+                blob = bucket.blob(f"plots/{zip_code}/{filename}")
+                if blob.exists():
+                    os.makedirs('static/plots', exist_ok=True)
+                    blob.download_to_filename(local_path)
+                    print(f"Successfully downloaded {filename} from GCS.")
+                else:
+                    print(f"Plot {filename} not found in GCS either.")
+        except Exception as e:
+            print(f"Error downloading plot from GCS: {e}")
+            
     return send_from_directory('static/plots', filename)
 
 if __name__ == '__main__':
