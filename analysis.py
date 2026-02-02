@@ -33,7 +33,7 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2)**2
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-def generate_plots(df, output_dir="static", zip_code=None):
+def generate_plots(df, output_dir="static", zip_code=None, dark_mode=False):
     """
     Generates demographic analysis plots from a DataFrame and saves them to output_dir.
     Returns a list of saved filenames.
@@ -43,6 +43,19 @@ def generate_plots(df, output_dir="static", zip_code=None):
 
     saved_files = []
     prefix = f"{zip_code}_" if zip_code else ""
+    suffix = "_dark" if dark_mode else ""
+    
+    # Theme configuration
+    bg_color = '#1a1b1e' if dark_mode else PARCHMENT
+    text_color = '#ced4da' if dark_mode else INK_BLACK
+    edge_color = '#373a40' if dark_mode else INK_BLACK
+    
+    # Update global style for this run
+    plt.rcParams['text.color'] = text_color
+    plt.rcParams['axes.labelcolor'] = text_color
+    plt.rcParams['axes.edgecolor'] = edge_color
+    plt.rcParams['xtick.color'] = text_color
+    plt.rcParams['ytick.color'] = text_color
 
     if 'pct_black' not in df.columns:
         print("Error: 'pct_black' column not found in the DataFrame.")
@@ -51,13 +64,13 @@ def generate_plots(df, output_dir="static", zip_code=None):
     # Create Histogram
     plt.figure(figsize=(10, 6))
     plt.hist(df['pct_black'].dropna(), bins=20, color=DUB_INDIGO, edgecolor='black', linewidth=1.5)
-    plt.title('DISTRIBUTION OF BLACK POPULATION %', fontweight='bold')
-    plt.xlabel('PERCENTAGE (%)')
-    plt.ylabel('COURSES')
+    plt.title('DISTRIBUTION OF BLACK POPULATION %', fontweight='bold', color=text_color)
+    plt.xlabel('PERCENTAGE (%)', color=text_color)
+    plt.ylabel('COURSES', color=text_color)
     
-    filename_hist = f"{prefix}demographic_distribution.png"
+    filename_hist = f"{prefix}demographic_distribution{suffix}.png"
     path_hist = os.path.join(output_dir, filename_hist)
-    plt.savefig(path_hist, facecolor=PARCHMENT)
+    plt.savefig(path_hist, facecolor=bg_color, edgecolor='none')
     plt.close()
     saved_files.append(filename_hist)
     
@@ -78,14 +91,14 @@ def generate_plots(df, output_dir="static", zip_code=None):
         colors = [DUB_RED, GOLF_GREEN]
 
     plt.bar(categories, counts, color=colors, edgecolor='black', linewidth=1.5)
-    plt.title('NEIGHBORHOOD DEMOGRAPHIC SPLIT', fontweight='bold')
-    plt.ylabel('COURSES')
+    plt.title('NEIGHBORHOOD DEMOGRAPHIC SPLIT', fontweight='bold', color=text_color)
+    plt.ylabel('COURSES', color=text_color)
     for i, v in enumerate(counts):
-        plt.text(i, v + 0.1, str(v), ha='center', fontweight='bold')
+        plt.text(i, v + 0.1, str(v), ha='center', fontweight='bold', color=text_color)
     
-    filename_binary = f"{prefix}demographic_split.png"
+    filename_binary = f"{prefix}demographic_split{suffix}.png"
     path_binary = os.path.join(output_dir, filename_binary)
-    plt.savefig(path_binary, facecolor=PARCHMENT)
+    plt.savefig(path_binary, facecolor=bg_color, edgecolor='none')
     plt.close()
     saved_files.append(filename_binary)
 
@@ -106,17 +119,17 @@ def generate_plots(df, output_dir="static", zip_code=None):
 
             plt.figure(figsize=(10, 6))
             plt.plot(df_sorted['distance'], df_sorted['relative_fraction'], marker='o', linestyle='-', color='purple')
-            plt.title('Cumulative Fraction of Black Population by Distance')
-            plt.xlabel('Distance from Origin (miles)')
-            plt.ylabel('Relative Fraction of Total Black Population')
-            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.title('Cumulative Fraction of Black Population by Distance', color=text_color)
+            plt.xlabel('Distance from Origin (miles)', color=text_color)
+            plt.ylabel('Relative Fraction of Total Black Population', color=text_color)
+            plt.grid(True, linestyle='--', alpha=0.3)
             plt.ylim(0, 1.05)
             plt.axvline(x=avg_dist, color='red', linestyle='--', label=f'Avg Distance: {avg_dist:.2f} mi')
             plt.legend()
             
-            filename_cum = f"{prefix}cumulative_distance_histogram.png"
+            filename_cum = f"{prefix}cumulative_distance_histogram{suffix}.png"
             path_cum = os.path.join(output_dir, filename_cum)
-            plt.savefig(path_cum, facecolor=PARCHMENT)
+            plt.savefig(path_cum, facecolor=bg_color, edgecolor='none')
             plt.close()
             saved_files.append(filename_cum)
 
@@ -126,23 +139,21 @@ def generate_plots(df, output_dir="static", zip_code=None):
     local_avg_pct = df['pct_black'].mean()
     
     plt.barh(['National Average', 'Local Results'], [avg_black_pct, local_avg_pct], 
-             color=[DUB_GOLD, INK_BLACK], edgecolor='black', linewidth=1.5)
-    plt.title('LOCAL VS NATIONAL DEMOGRAPHIC COMPARISON', fontweight='bold')
+             color=[DUB_GOLD, INK_BLACK if not dark_mode else '#ced4da'], edgecolor=edge_color, linewidth=1.5)
+    plt.title('LOCAL VS NATIONAL DEMOGRAPHIC COMPARISON', fontweight='bold', color=text_color)
     plt.xlim(0, max(avg_black_pct, local_avg_pct) * 1.2)
     for i, v in enumerate([avg_black_pct, local_avg_pct]):
-        plt.text(v + 0.5, i, f"{v:.1f}%", va='center', fontweight='bold')
+        plt.text(v + 0.5, i, f"{v:.1f}%", va='center', fontweight='bold', color=text_color)
     
-    filename_comp = f"{prefix}comparative_bar.png"
+    filename_comp = f"{prefix}comparative_bar{suffix}.png"
     path_comp = os.path.join(output_dir, filename_comp)
-    plt.savefig(path_comp, facecolor=PARCHMENT)
+    plt.savefig(path_comp, facecolor=bg_color, edgecolor='none')
     plt.close()
     saved_files.append(filename_comp)
 
     # Task 8: The Research Funnel Pyramid
     plt.figure(figsize=(8, 6))
     layers = ['ZIPS SCANNED', 'COURSES FOUND', 'MAJORITY BLACK']
-    # If the user only scanned one zip, we set it to 1. 
-    # In a real loop, we'd pass the actual count.
     counts = [1, len(df), len(df[df['pct_black'] > 50])]
     colors = [DUB_INDIGO, DUB_RED, DUB_GOLD]
     
@@ -152,12 +163,12 @@ def generate_plots(df, output_dir="static", zip_code=None):
         plt.text(0, i, f"{layer}\n({count})", ha='center', va='center', color='white', fontweight='bold')
     
     plt.axis('off')
-    plt.title('THE RESEARCH FUNNEL', fontweight='bold', pad=20)
+    plt.title('THE RESEARCH FUNNEL', fontweight='bold', pad=20, color=text_color)
     
     # Task 6: Scaled Progression Circles
     plt.figure(figsize=(6, 8))
     radii_mi = [10, 15, 25]
-    colors_circ = [PARCHMENT, DUB_GOLD, DUB_RED, DUB_INDIGO]
+    colors_circ = [PARCHMENT if not dark_mode else '#25262b', DUB_GOLD, DUB_RED, DUB_INDIGO]
     
     # Calculate counts for each radius
     if 'distance' not in df.columns and 'search_lat' in df.columns:
@@ -172,18 +183,18 @@ def generate_plots(df, output_dir="static", zip_code=None):
         vis_radii = [ (c/max_c)**0.5 for c in counts_at_radii ]
         
         for i, (v_r, c, r_mi) in enumerate(zip(vis_radii, counts_at_radii, radii_mi)):
-            circle = plt.Circle((0, -i*2.5), v_r, color=colors_circ[i % len(colors_circ)], ec='black', lw=1.5)
+            circle = plt.Circle((0, -i*2.5), v_r, color=colors_circ[i % len(colors_circ)], ec=edge_color, lw=1.5)
             plt.gca().add_artist(circle)
-            plt.text(0, -i*2.5, f"{r_mi}mi\n{c} Courses", ha='center', va='center', fontweight='bold')
+            plt.text(0, -i*2.5, f"{r_mi}mi\n{c} Courses", ha='center', va='center', fontweight='bold', color=INK_BLACK if i % len(colors_circ) == 0 and not dark_mode else 'white')
             
         plt.xlim(-1.5, 1.5)
         plt.ylim(-7, 1.5)
         plt.axis('off')
-        plt.title('SCALED SEARCH PROGRESSION', fontweight='bold')
+        plt.title('SCALED SEARCH PROGRESSION', fontweight='bold', color=text_color)
         
-        filename_circles = f"{prefix}progression_circles.png"
+        filename_circles = f"{prefix}progression_circles{suffix}.png"
         path_circles = os.path.join(output_dir, filename_circles)
-        plt.savefig(path_circles, facecolor=PARCHMENT)
+        plt.savefig(path_circles, facecolor=bg_color, edgecolor='none')
         plt.close()
         saved_files.append(filename_circles)
 
@@ -199,12 +210,12 @@ def generate_plots(df, output_dir="static", zip_code=None):
         
         plt.barh(labels, income_counts, color=[DUB_INDIGO, DUB_RED, DUB_GOLD, GOLF_GREEN], 
                  edgecolor='black', linewidth=1.5)
-        plt.title('MEDIAN INCOME CORRELATION', fontweight='bold')
-        plt.xlabel('COURSE COUNT')
+        plt.title('MEDIAN INCOME CORRELATION', fontweight='bold', color=text_color)
+        plt.xlabel('COURSE COUNT', color=text_color)
         
-        filename_income = f"{prefix}income_correlation.png"
+        filename_income = f"{prefix}income_correlation{suffix}.png"
         path_income = os.path.join(output_dir, filename_income)
-        plt.savefig(path_income, facecolor=PARCHMENT)
+        plt.savefig(path_income, facecolor=bg_color, edgecolor='none')
         plt.close()
         saved_files.append(filename_income)
 

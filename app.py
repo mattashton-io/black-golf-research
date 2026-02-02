@@ -235,17 +235,18 @@ def search():
         })
     df = pd.DataFrame(df_data)
     
-    # 4. Generate plots
-    plot_files = generate_plots(df, output_dir="static/plots", zip_code=zip_code)
+    # 4. Generate plots (Both themes)
+    light_plots = generate_plots(df, output_dir="static/plots", zip_code=zip_code, dark_mode=False)
+    dark_plots = generate_plots(df, output_dir="static/plots", zip_code=zip_code, dark_mode=True)
     
     # Synchronize plots to GCS
-    upload_plots_to_gcs(zip_code, plot_files)
+    upload_plots_to_gcs(zip_code, light_plots + dark_plots)
     
     result = {
         "lat": lat,
         "lng": lng,
         "courses": courses_list,
-        "plots": plot_files,
+        "plots": light_plots, # Cache just the basename-style list (logic handles suffixes)
         "message": f"Found {len(courses_list)} courses."
     }
     
@@ -294,21 +295,59 @@ def enrich_course():
             
     return jsonify(enrichment)
 
+def recreate_theme_plots(zip_code, dark_mode=False):
+    """Reconstructs DataFrame from cache and generates plots for a specific theme."""
+    from maps_golf_lookup import load_from_gcs
+    print(f"Recreating {'dark' if dark_mode else 'light'} plots for {zip_code} from cache...")
+    
+    cached_data = load_from_gcs(zip_code=zip_code)
+    if not cached_data or 'courses' not in cached_data:
+        print(f"Failed to recreate plots: No cache found for {zip_code}")
+        return []
+    
+    courses_list = cached_data['courses']
+    df_data = []
+    for c in courses_list:
+        df_data.append({
+            'name': c.get('name'),
+            'lat': c['geometry']['location']['lat'],
+            'lng': c['geometry']['location']['lng'],
+            'pct_black': c.get('pct_black', 0),
+            'is_plurality_black': c.get('is_plurality_black', False),
+            'total_pop': c.get('total_pop', 0),
+            'search_lat': cached_data.get('lat'),
+            'search_lng': cached_data.get('lng'),
+            'median_income': c.get('median_income')
+        })
+    df = pd.DataFrame(df_data)
+    
+    # Generate requested theme plots
+    new_plots = generate_plots(df, output_dir="static/plots", zip_code=zip_code, dark_mode=dark_mode)
+    
+    # Sync to GCS
+    upload_plots_to_gcs(zip_code, new_plots)
+    return new_plots
+
 @app.route('/search_plot/<path:filename>')
 def serve_plot(filename):
-    """Serves a plot file, downloading it from GCS if not found locally."""
+    """Serves a plot file, downloading it from GCS if not found locally, 
+    or regenerating it if missing from GCS."""
     local_path = os.path.join('static/plots', filename)
     
     if not os.path.exists(local_path):
         print(f"Plot {filename} not found locally. Attempting GCS download...")
-        # Filename format: {zip_code}_{plot_type}.png
+        # Filename format: {zip_code}_{plot_type}(_dark).png
         try:
-            zip_code = filename.split('_')[0]
+            name_parts = filename.split('_')
+            zip_code = name_parts[0]
+            is_dark = "_dark.png" in filename
+            
             if zip_code:
                 from google.cloud import storage
                 from maps_golf_lookup import secret_bucket_id
                 storage_client = storage.Client()
                 bucket = storage_client.bucket(secret_bucket_id)
+                
                 # GCS path: plots/{zip_code}/{filename}
                 blob = bucket.blob(f"plots/{zip_code}/{filename}")
                 if blob.exists():
@@ -316,9 +355,13 @@ def serve_plot(filename):
                     blob.download_to_filename(local_path)
                     print(f"Successfully downloaded {filename} from GCS.")
                 else:
-                    print(f"Plot {filename} not found in GCS either.")
+                    print(f"Plot {filename} not found in GCS. Attempting on-demand generation...")
+                    recreate_theme_plots(zip_code, dark_mode=is_dark)
+                    # Local path should now exist
+                    if not os.path.exists(local_path):
+                        print(f"Failed to generate {filename} on-demand.")
         except Exception as e:
-            print(f"Error downloading plot from GCS: {e}")
+            print(f"Error serving/generating plot: {e}")
             
     return send_from_directory('static/plots', filename)
 

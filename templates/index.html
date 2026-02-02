@@ -148,36 +148,36 @@
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
             <div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-main opacity-60">Address</label>
-                    <p id="modalAddress" class="text-sm font-bold text-main">N/A</p>
+                    <label class="text-[10px] uppercase font-black text-main opacity-60">Address</label>
+                    <p id="modalAddress" class="text-sm font-medium text-main">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-main opacity-60">Phone</label>
-                    <p id="modalPhone" class="text-sm font-bold text-main">N/A</p>
+                    <label class="text-[10px] uppercase font-black text-main opacity-60">Phone</label>
+                    <p id="modalPhone" class="text-sm font-medium text-main">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-main opacity-60">Website</label>
+                    <label class="text-[10px] uppercase font-black text-main opacity-60">Website</label>
                     <a id="modalWebsite" href="#" target="_blank"
-                        class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
+                        class="text-sm bgr-teal-text hover:underline block truncate font-medium">N/A</a>
                 </div>
                 <div class="mt-6 p-4 rounded bg-white/30 border" style="border-color: var(--dubois-indigo);">
                     <div class="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2 mb-2">
-                        <span class="text-sm font-bold uppercase text-main opacity-80">Current Weather</span>
-                        <span id="modalWeather" class="text-lg font-bold" style="color: var(--golf-green);">Loading...</span>
+                        <span class="text-sm font-black uppercase text-main opacity-80">Current Weather</span>
+                        <span id="modalWeather" class="text-lg font-black" style="color: var(--golf-green);">Loading...</span>
                     </div>
                     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                         <div class="flex items-center space-x-2">
-                            <span class="text-main opacity-70 font-medium">Feels Like:</span>
-                            <span id="modalFeelsLike" class="font-bold text-main">N/A</span>
+                            <span class="text-main opacity-70 font-black">Feels Like:</span>
+                            <span id="modalFeelsLike" class="font-medium text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-main opacity-70 font-medium">Humidity:</span>
-                            <span id="modalHumidity" class="font-bold text-main">N/A</span>
+                            <span class="text-main opacity-70 font-black">Humidity:</span>
+                            <span id="modalHumidity" class="font-medium text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-main opacity-70 font-medium">Wind:</span>
+                            <span class="text-main opacity-70 font-black">Wind:</span>
                             <div class="flex items-center">
-                                <span id="modalWind" class="font-bold text-main">N/A</span>
+                                <span id="modalWind" class="font-medium text-main">N/A</span>
                                 <div id="windArrow" class="ml-1 flex items-center hidden">
                                     <svg id="windArrowSvg" class="w-4 h-4 transform transition-transform duration-500" fill="none"
                                         stroke="currentColor" viewBox="0 0 24 24">
@@ -188,12 +188,12 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-main opacity-70 font-medium">Precip (6h):</span>
-                            <span id="modalPrecip" class="font-bold text-main">N/A</span>
+                            <span class="text-main opacity-70 font-black">Precip (6h):</span>
+                            <span id="modalPrecip" class="font-medium text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-main opacity-70 font-bold">Median Income:</span>
-                            <span id="modalIncome" class="font-bold text-xl" style="color: var(--dubois-indigo);">N/A</span>
+                            <span class="text-main opacity-70 font-black">Median Income:</span>
+                            <span id="modalIncome" class="font-black text-xl" style="color: var(--dubois-indigo);">N/A</span>
                         </div>
                         </div>
                         <p class="text-[9px] text-main opacity-50 mt-3 italic text-right">Source: WeatherNext & Maps API</p>
@@ -306,9 +306,11 @@
             // Update Plots
             const plotsContainer = document.getElementById("plotsContainer");
             plotsContainer.innerHTML = "";
+            const isDark = document.body.classList.contains('dark');
             data.plots.forEach(plot => {
                 const img = document.createElement("img");
-                img.src = `/search_plot/${plot}?t=${new Date().getTime()}`;
+                const themedPlot = isDark ? plot.replace(".png", "_dark.png") : plot;
+                img.src = `/search_plot/${themedPlot}?t=${new Date().getTime()}`;
                 img.className = "w-full rounded shadow border bgr-teal-border";
                 plotsContainer.appendChild(img);
             });
@@ -582,6 +584,20 @@
                         if (!document.getElementById("detailsModal").classList.contains("hidden") && lastDetailedCourse) {
                             updateDemographicChart(lastDetailedCourse);
                         }
+
+                        // Update plots in container if they exist
+                        const plotsContainer = document.getElementById("plotsContainer");
+                        const plotImages = plotsContainer.querySelectorAll("img");
+                        plotImages.forEach(img => {
+                            const currentSrc = img.src;
+                            if (isDark) {
+                                if (!currentSrc.includes("_dark.png")) {
+                                    img.src = currentSrc.replace(".png", "_dark.png");
+                                }
+                            } else {
+                                img.src = currentSrc.replace("_dark.png", ".png");
+                            }
+                        });
                     }
 
         window.onload = initMap;
