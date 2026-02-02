@@ -34,6 +34,10 @@
         .bgr-dark-bg { background-color: var(--bgr-dark); }
         .bgr-teal-text { color: var(--bgr-teal); }
         .bgr-teal-border { border-color: var(--bgr-teal); }
+
+        /* Wind arrow theme styling */
+        #windArrowSvg { color: var(--dubois-indigo); }
+        body.dark #windArrowSvg { color: var(--dubois-gold); }
         
         body { background-color: var(--bg-body); color: var(--text-main); transition: background-color 0.3s, color 0.3s; font-family: 'Inter', sans-serif; }
         .bg-card { background-color: var(--bg-card); border-color: var(--border-color); border-width: 1px; }
@@ -144,15 +148,15 @@
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
             <div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500">Address</label>
-                    <p id="modalAddress" class="text-sm font-bold" style="color: var(--ink-black);">N/A</p>
+                    <label class="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Address</label>
+                    <p id="modalAddress" class="text-sm font-bold text-main">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-500">Phone</label>
-                    <p id="modalPhone" class="text-sm font-bold" style="color: var(--ink-black);">N/A</p>
+                    <label class="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Phone</label>
+                    <p id="modalPhone" class="text-sm font-bold text-main">N/A</p>
                 </div>
                 <div class="mb-4">
-                    <label class="text-[10px] uppercase font-bold text-gray-400">Website</label>
+                    <label class="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Website</label>
                     <a id="modalWebsite" href="#" target="_blank"
                         class="text-sm bgr-teal-text hover:underline block truncate">N/A</a>
                 </div>
@@ -164,7 +168,7 @@
                     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                         <div class="flex items-center space-x-2">
                             <span class="text-gray-500 dark:text-gray-400 font-medium">Feels Like:</span>
-                            <span id="modalFeelsLike" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
+                            <span id="modalFeelsLike" class="font-bold text-main">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
                             <span class="text-gray-500 dark:text-gray-400 font-medium">Humidity:</span>
@@ -175,7 +179,7 @@
                             <div class="flex items-center">
                                 <span id="modalWind" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                                 <div id="windArrow" class="ml-1 flex items-center hidden">
-                                    <svg id="windArrowSvg" class="w-4 h-4 text-teal-500 transform transition-transform duration-500" fill="none"
+                                    <svg id="windArrowSvg" class="w-4 h-4 transform transition-transform duration-500" fill="none"
                                         stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 19V5m0 0l-7 7m7-7l7 7">
                                         </path>
@@ -188,7 +192,7 @@
                             <span id="modalPrecip" class="font-bold text-gray-900 dark:text-gray-100">N/A</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-gray-700 font-bold">Median Income:</span>
+                            <span class="text-gray-500 dark:text-gray-300 font-bold">Median Income:</span>
                             <span id="modalIncome" class="font-bold text-xl" style="color: var(--dubois-indigo);">N/A</span>
                         </div>
                         </div>

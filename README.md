@@ -11,6 +11,12 @@ A web application to explore and analyze the geographic distribution of golf cou
 - **Dark Mode**: Fully implemented dark mode for low-light research.
 - **Data Export**: Unique course data is automatically cached and exported to GCS in JSON format.
 
+## Key Improvements (Jan 2026)
+
+- **Enhanced Visualizations**: Improved plotting in `analysis.py` with larger fonts and a new demographic split chart that includes **Plurality Black** neighborhoods.
+- **Accessibility & Branding**: Refined the UI for better WCAG compliance. The "View Details" modal and current weather sections now feature theme-aware text colors.
+- **Dynamic Styling**: The wind arrow visualization now toggles its color palette (Indigo/Gold) based on the active theme (Light/Dark mode).
+
 ## Setup
 
 1. **Environment Variables**: Use a `.env` file to store references to Google Cloud secrets.

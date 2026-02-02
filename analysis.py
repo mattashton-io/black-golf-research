@@ -9,6 +9,7 @@ import math
 # Task 3: Global Matplotlib Styling
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Liberation Sans', 'Arial', 'DejaVu Sans']
+plt.rcParams['font.size'] = 12
 plt.rcParams['axes.linewidth'] = 1.5
 plt.rcParams['axes.edgecolor'] = '#1A1A1A'
 plt.rcParams['axes.spines.top'] = False
@@ -58,17 +59,27 @@ def generate_plots(df, output_dir="static"):
     plt.close()
     saved_files.append("demographic_distribution.png")
     
-    # Create Binary Split Bar Plot (> 51% vs Not)
-    plt.figure(figsize=(8, 6))
-    majority_black = df[df['pct_black'] > 51].shape[0]
-    not_majority_black = df[df['pct_black'] <= 51].shape[0]
-    categories = ['Majority Black (> 51%)', 'Other (≤ 51%)']
-    counts = [majority_black, not_majority_black]
-    plt.bar(categories, counts, color=[DUB_RED, GOLF_GREEN], edgecolor='black', linewidth=1.5)
-    plt.title('NEIGHBORHOOD BINARY SPLIT', fontweight='bold')
+    # Create Binary Split Bar Plot (> 50% vs Plurality vs Other)
+    plt.figure(figsize=(10, 6))
+    majority_black = df[df['pct_black'] > 50].shape[0]
+    # Plurality is when it's NOT majority but is_plurality_black is True
+    if 'is_plurality_black' in df.columns:
+        plurality_black = df[(df['pct_black'] <= 50) & (df['is_plurality_black'] == True)].shape[0]
+        other = df[(df['pct_black'] <= 50) & (df['is_plurality_black'] == False)].shape[0]
+        categories = ['Majority Black (>50%)', 'Plurality Black', 'Other']
+        counts = [majority_black, plurality_black, other]
+        colors = [DUB_RED, DUB_GOLD, GOLF_GREEN]
+    else:
+        not_majority_black = df[df['pct_black'] <= 50].shape[0]
+        categories = ['Majority Black (> 50%)', 'Other (≤ 50%)']
+        counts = [majority_black, not_majority_black]
+        colors = [DUB_RED, GOLF_GREEN]
+
+    plt.bar(categories, counts, color=colors, edgecolor='black', linewidth=1.5)
+    plt.title('NEIGHBORHOOD DEMOGRAPHIC SPLIT', fontweight='bold')
     plt.ylabel('COURSES')
     for i, v in enumerate(counts):
-        plt.text(i, v + 0.5, str(v), ha='center', fontweight='bold')
+        plt.text(i, v + 0.1, str(v), ha='center', fontweight='bold')
     
     path_binary = os.path.join(output_dir, "demographic_split.png")
     plt.savefig(path_binary, facecolor=PARCHMENT)

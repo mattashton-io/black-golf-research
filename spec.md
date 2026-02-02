@@ -36,8 +36,15 @@
 * **Layout:**  
   * **Output Boxes:** Set output text boxes to a fixed size (e.g., 50-65% of vertical screen dimension) and include a scrollbar for overflow content.  
   * **Multi-Model Comparison:** When comparing models (A/B testing), use separate, decoupled routes (e.g., /get\_fact\_one, /get\_fact\_two) so requests run independently and minimize user wait time.  
-* **Theming:**  
-  * **Context:** Match the color scheme to the subject matter (e.g., "Commonwealth of Virginia" blue/white or "Tiger Woods" red/black).
+* **Theme & Color Palette Implementation**
+  * **Context:** Modify :root and body.dark in templates/index.html with the following hex codes:  
+    * Parchment (BG): \#E8D9C5 (Light mode base)  
+    * Golf Green: \#006442 (Replaces current teal)  
+    * Du Bois Red: \#D22030  
+    * Du Bois Indigo: \#2C3E75  
+    * Du Bois Gold: \#E2A62C  
+    * Ink Black: \#1A1A1A (Primary text)
+  * **Accessibility:** Make sure text colors match Du Bois style color palette but also comply with WCAG AA accessibility standards (e.g. black text on light backgrounds, white text on dark backgrounds).
 
 ## **5\. Deployment & Infrastructure**
 

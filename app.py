@@ -188,6 +188,7 @@ def search():
             'lat': c['geometry']['location']['lat'],
             'lng': c['geometry']['location']['lng'],
             'pct_black': c.get('pct_black', 0),
+            'is_plurality_black': c.get('is_plurality_black', False),
             'total_pop': c.get('total_pop', 0),
             'search_lat': lat,
             'search_lng': lng

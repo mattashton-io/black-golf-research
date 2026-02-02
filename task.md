@@ -1,15 +1,20 @@
 # Development Roadmap: black-golf-research
 
 ## Current Status
-- 
+* Fixing broken images when retrieving cached results from GCS.
 
 ## Proposed Tasks
-
-- [ ] Labels in View Details are too small and hard to read (e.g. Feels Like, Wind, Humidity,Precipitation values are white text on a very light background). Labels in View Details should be a heavier font weight and a darker color compared to the values that they are labeling.
-- [ ] font sizes for visualizations are too small
-- [ ] better contrast for black text on dark backgrounds, try white text with black outline. REFERENCE temp/totals-pyramid-chart.jpg
-- [ ] binary split chart: show binary + plurality REFERENCE temp/percentage-histogram.jpg
-- [ ] wind arrow color should match color palette (try blue in light mode and gold in dark mode)
+* [ ] **Implement Unique Plot Filenames**  
+  * Logic: Update analysis.py's generate\_plots function to accept zip\_code as an argument.  
+  * Styling: Prefix all generated plot filenames with the zip\_code (e.g., 10001\_demographic\_distribution.png) to prevent collisions and support multi-user caching.  
+* [ ] **Synchronize Plots to GCS**  
+  * Logic: In app.py, after generate\_plots is called in the /search route, upload the resulting .png files from the local static/plots/ directory to the GCS bucket defined by SECRET\_BUCKET.  
+  * Path: Store them under plots/{zip\_code}/ in the bucket.  
+* [ ] **Resilient Plot Serving Route**  
+  * Logic: Refactor the @app.route('/search\_plot/\<path:filename\>') in app.py.  
+  * Behavior: Check if the file exists in the local static/plots/ directory. If missing (common in stateless Cloud Run environments), attempt to download the file from GCS using the SECRET\_BUCKET and the corresponding zip\_code prefix before serving.  
+* [ ] **Update Cache JSON Structure**  
+  * Logic: Ensure the result dictionary saved to save\_to\_zip\_cache contains the full relative path or unique filename for the plots, ensuring the frontend can request the specific unique images.
 
 
 ## Permanent Tasks
