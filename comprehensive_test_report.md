@@ -1,11 +1,11 @@
 # Comprehensive Test Report (Partial)
-Generated: 2026-02-03T22:20:48.993996
+Generated: 2026-02-03T22:37:42.345066
 
 ## Summary
-- Total Zips: 100
-- Search Success: 100/100
-- Weather OK: 100/100
-- Enrichment OK: 100/100
+- Total Zips: 140
+- Search Success: 140/140
+- Weather OK: 140/140
+- Enrichment OK: 140/140
 
 ## Detailed Log (Sample or Failures)
 | Zip | Result | Latency (S/W/E) | Courses | Errors |

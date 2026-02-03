@@ -176,10 +176,13 @@ def search():
     if cached_data and isinstance(cached_data, dict):
         # Ensure cached data is complete for frontend and contains NEW demographics
         courses = cached_data.get('courses', [])
-        has_new_demographics = courses and 'pct_white' in courses[0]
+        # Strict validation based on spec.md
+        mandatory_fields = ['pct_poverty', 'holc_grade', 'barrier_to_entry', 'total_pop']
+        is_complete = courses and all(all(f in c for f in mandatory_fields) for c in courses)
+        
         cached_plots = cached_data.get('plots', [])
         
-        if all(k in cached_data for k in ['lat', 'lng', 'courses', 'plots']) and has_new_demographics:
+        if all(k in cached_data for k in ['lat', 'lng', 'courses', 'plots']) and is_complete:
             # NEW: Verify that the plots actually exist in GCS
             try:
                 storage_client = storage.Client()

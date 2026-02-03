@@ -2,19 +2,18 @@
 
 ## **1\. Core Libraries & Dependencies**
 
-* **Generative AI SDK:**
-  * **REQUIREMENT:** Use `google.genai` instead of the deprecated `google-generativeai` package.  
+* **Generative AI SDK:**  
+  * **REQUIREMENT:** Use google.genai instead of the deprecated google-generativeai package.  
   * **Reasoning:** The older library is deprecated, and newer models (like Gemini 3\) are optimized for the new SDK.  
-    **Environment Variables:**  
-  * **REQUIREMENT:** **DO** load environment variables from `.env` files (e.g., using `python-dotenv`).  
-  * **Constraint:** These files **DO NOT** store actual API keys or secrets. They only store **variable references** (e.g., `SECRET_RESOURCE_ID=projects/123/secrets/my-key/versions/1`).  
+* **Environment Variables:**  
+  * **REQUIREMENT:** **DO** load environment variables from .env files (e.g., using python-dotenv).  
+  * **Constraint:** These files **DO NOT** store actual API keys or secrets. They only store **variable references** (e.g., SECRET\_RESOURCE\_ID=projects/123/secrets/my-key/versions/1).  
   * **Implementation:** The application must read the reference from the environment variable and then use the **Google Secret Manager** client to fetch the actual secret payload.
 
 ## **2\. AI Model Selection & Prompting**
 
 * **Model Versions:**  
   * **REQUIREMENT:** ALWAYS USE Google Search to find the latest available stable Gemini models (e.g., gemini-3-pro-preview, gemini-3-flash-preview). **DO NOT** use deprecated models like gemini-1.5-pro or gemini-2.0-pro.  
-  
 * **Prompt Engineering:**  
   * **Formatting:** Move common prompt variables outside of function definitions (e.g., to the top of the file) to reduce redundancy.  
   * **Directives:** Use "MAXIMUM TWO TO THREE SENTENCES" (in all caps) to force concise model outputs for demos.  
@@ -27,7 +26,7 @@
   * **REQUIREMENT:** Use **Google Secret Manager** for all API keys (e.g., Gemini API Key) and OAuth tokens (token.json).  
   * **Implementation:** Refactor code to fetch secrets dynamically using google-cloud-secret-manager.  
 * **Git Security:**  
-  * **REQUIREMENT:** Always include a .gitignore file that excludes env\* ,.env,  \*.json, \_\_pycache\_\_, and static/\*.mp3 to prevent accidental leakage.
+  * **REQUIREMENT:** Always include a .gitignore file that excludes env\*, .env, \*.json, \_\_pycache\_\_, and static/\*.mp3 to prevent accidental leakage.
 
 ## **4\. UI/UX Design**
 
@@ -36,26 +35,30 @@
 * **Layout:**  
   * **Output Boxes:** Set output text boxes to a fixed size (e.g., 50-65% of vertical screen dimension) and include a scrollbar for overflow content.  
   * **Multi-Model Comparison:** When comparing models (A/B testing), use separate, decoupled routes (e.g., /get\_fact\_one, /get\_fact\_two) so requests run independently and minimize user wait time.  
-* **Theme & Color Palette Implementation**
-  * **Context:** Modify :root and body.dark in templates/index.html with the following hex codes:  
-    * Parchment (BG): \#E8D9C5 (Light mode base)  
-    * Golf Green: \#006442 (Replaces current teal)  
-    * Du Bois Red: \#D22030  
-    * Du Bois Indigo: \#2C3E75  
-    * Du Bois Gold: \#E2A62C  
-    * Ink Black: \#1A1A1A (Primary text)
-  * **Accessibility:** Make sure text colors match Du Bois style color palette but also comply with WCAG AA accessibility standards (e.g. black text on light backgrounds, white text on dark backgrounds).
+* **Theming:**  
+  * **Context:** Match the color scheme to the subject matter (e.g., "Commonwealth of Virginia" blue/white or "Tiger Woods" red/black).
 
 ## **5\. Deployment & Infrastructure**
 
 * **Containerization:**  
   * **Base Image:** Use python:3.13-slim for smaller, more efficient container images.  
-  * **Port Configuration:** Configure the Flask app to listen on port 8080 (Cloud Run default) using os.environ.get('PORT', 8080\).  
+  * **Port Configuration:** Configure the Flask app to listen on port 8080 (Cloud Run default) using os.environ.get('PORT', 8080).  
   * **File Handling:** Explicitly copy necessary files (e.g., templates/) in the Dockerfile to avoid "Template Not Found" errors.  
 * **Planning:**  
   * **Task Management:** Create a tasks.md file in the repo to plan out upgrades based on the README.md to-do items. Use this for "meta-prompting" to guide AI coding assistants.
 
-## **6\. Specific Tooling Integrations**
+## **6\. Caching & Data Persistence**
+
+* **Cache Validation:**  
+  * **REQUIREMENT:** If a requested zip code or specific search result is missing from the GCS/local cache, or if the cached data is incomplete, the application **MUST** trigger a fresh re-query to the external APIs (Google Maps, Census, etc.).
+  * **Incompleteness Criteria:** Data is considered incomplete if it lacks any of the following:
+    * **Core Demographics:** Black population %, Total Population.
+    * **Social Equity Metrics:** Poverty Rate, HOLC Redlining Grade, Barrier to Entry (Operational Status).
+    * **Enrichment:** Official website, phone number.
+    * **Assets:** Analysis plots for both light and dark modes.
+  * **Logic:** Never serve partial or "broken" results from a stale cache. Re-run enrichment loops if any mandatory metric is missing.
+
+## **7\. Specific Tooling Integrations**
 
 * **MCP (Model Context Protocol):**  
   * **Docstrings:** Always include docstrings for MCP tools/functions, as AI agents read these to understand the tool's purpose.  
