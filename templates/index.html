@@ -160,6 +160,10 @@
                     <a id="modalWebsite" href="#" target="_blank"
                         class="text-sm bgr-teal-text hover:underline block truncate font-medium">N/A</a>
                 </div>
+                <div class="mb-4 flex flex-wrap gap-2">
+                    <div id="modalBarrier" class="px-2 py-1 rounded text-[10px] font-black uppercase border border-gray-400">Barrier: N/A</div>
+                    <div id="modalHOLC" class="px-2 py-1 rounded text-[10px] font-black uppercase border border-gray-400">Historical: N/A</div>
+                </div>
                 <div class="mt-6 p-4 rounded bg-white/30 border" style="border-color: var(--dubois-indigo);">
                     <div class="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2 mb-2">
                         <span class="text-sm font-black uppercase text-main opacity-80">Current Weather</span>
@@ -194,6 +198,10 @@
                         <div class="flex items-center space-x-2">
                             <span class="text-main opacity-70 font-black">Median Income:</span>
                             <span id="modalIncome" class="font-black text-xl" style="color: var(--dubois-indigo);">N/A</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-main opacity-70 font-black">Poverty Rate:</span>
+                            <span id="modalPoverty" class="font-black text-lg" style="color: var(--dubois-red);">N/A</span>
                         </div>
                         </div>
                         <p class="text-[9px] text-main opacity-50 mt-3 italic text-right">Source: WeatherNext & Maps API</p>
@@ -328,7 +336,8 @@
                     </div>
                     <div class="mt-4 flex flex-col gap-2">
                         <div class="flex justify-between items-center text-xs font-semibold">
-                            <span>${course.pct_black || 0}% Black Pop</span>
+                            <span>${course.pct_black || 0}% Black</span>
+                            <span>${course.pct_poverty || 0}% Poverty</span>
                             <span class="bg-card text-main border border-gray-500 px-2 py-0.5 rounded">Pop: ${course.total_pop || 0}</span>
                         </div>
                         <button onclick="showCourseDetails('${course.place_id}')" class="w-full py-1 text-xs font-bold uppercase border transition" style="border-color: var(--golf-green); color: var(--golf-green);">
@@ -357,13 +366,30 @@
                 document.getElementById("modalAddress").innerText = course.formatted_address || course.vicinity || '-';
 
                 // Reset fields to loading state
-                const fieldsToReset = ["modalPhone", "modalWebsite", "modalWeather", "modalFeelsLike", "modalWind", "modalPrecip", "modalHumidity", "modalIncome"];
+                const fieldsToReset = ["modalPhone", "modalWebsite", "modalWeather", "modalFeelsLike", "modalWind", "modalPrecip", "modalHumidity", "modalIncome", "modalPoverty"];
                 fieldsToReset.forEach(id => {
                     const el = document.getElementById(id);
                     el.innerText = "-";
                     el.classList.add("loading-pulse");
                 });
                 
+                document.getElementById("modalBarrier").innerText = "Barrier: " + (course.barrier_to_entry || "Unknown");
+                document.getElementById("modalHOLC").innerText = "Historical Grade: " + (course.holc_grade || "N/A");
+                
+                // Colorize HOLC Grade
+                const holcEl = document.getElementById("modalHOLC");
+                const grade = course.holc_grade;
+                if (grade === "D") {
+                    holcEl.style.backgroundColor = "var(--dubois-red)";
+                    holcEl.style.color = "white";
+                } else if (grade === "C") {
+                    holcEl.style.backgroundColor = "var(--dubois-gold)";
+                    holcEl.style.color = "black";
+                } else {
+                    holcEl.style.backgroundColor = "transparent";
+                    holcEl.style.color = "inherit";
+                }
+
                 const website = document.getElementById("modalWebsite");
                 website.href = "#";
 
@@ -466,10 +492,14 @@
                     document.getElementById("modalWebsite").classList.remove("loading-pulse");
                 }
 
-                // Update Median Income from course data
+                // Update Income & Poverty
                 const incomeEl = document.getElementById("modalIncome");
                 incomeEl.innerText = course.median_income ? `$${course.median_income.toLocaleString()}` : "N/A";
                 incomeEl.classList.remove("loading-pulse");
+
+                const povertyEl = document.getElementById("modalPoverty");
+                povertyEl.innerText = (course.pct_poverty !== undefined) ? `${course.pct_poverty}%` : "N/A";
+                povertyEl.classList.remove("loading-pulse");
 
                 
             }

@@ -3,11 +3,13 @@ import pandas as pd
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from maps_golf_lookup import (
     search_golf_courses, 
-    MAPS_KEY, 
     export_to_gcs, 
     load_from_gcs, 
     save_to_zip_cache,
-    update_course_in_cache
+    update_course_in_cache,
+    get_demographics,
+    get_maps_key,
+    get_census_key
 )
 from analysis import generate_plots
 import googlemaps
@@ -28,7 +30,13 @@ bq_client = bigquery.Client()
 
 # Geocoding client for zip code lookup
 from maps_golf_lookup import API_TIMEOUT
-gmaps_client = googlemaps.Client(key=MAPS_KEY, timeout=API_TIMEOUT)
+# Client will be initialized lazily in routes to avoid startup block
+_gmaps_client = None
+def get_gmaps_client():
+    global _gmaps_client
+    if _gmaps_client is None:
+        _gmaps_client = googlemaps.Client(key=get_maps_key(), timeout=API_TIMEOUT)
+    return _gmaps_client
 
 def calculate_wind_info(u, v):
     """Converts U and V components (m/s) to magnitude (mph), bearing, and cardinal direction."""
@@ -61,7 +69,7 @@ def get_weather_for_location(lat, lng):
     try:
         weather_url = f"https://weather.googleapis.com/v1/currentConditions:lookup"
         params = {
-            "key": MAPS_KEY,
+            "key": get_maps_key(),
             "location.latitude": lat,
             "location.longitude": lng
         }
@@ -130,7 +138,7 @@ def get_weather_for_location(lat, lng):
 
 @app.route('/')
 def index():
-    return render_template('index.html', maps_key=MAPS_KEY)
+    return render_template('index.html', maps_key=get_maps_key())
 
 def upload_plots_to_gcs(zip_code, plot_files):
     """Uploads generated plot files to GCS under plots/{zip_code}/."""
@@ -196,7 +204,7 @@ def search():
 
     # 1. Geocode zip code
     try:
-        geocode_result = gmaps_client.geocode(zip_code)
+        geocode_result = get_gmaps_client().geocode(zip_code)
         if not geocode_result:
             return jsonify({"error": "Could not geocode zip code"}), 404
         
@@ -228,7 +236,10 @@ def search():
             'lat': c['geometry']['location']['lat'],
             'lng': c['geometry']['location']['lng'],
             'pct_black': c.get('pct_black', 0),
+            'pct_poverty': c.get('pct_poverty', 0),
             'is_plurality_black': c.get('is_plurality_black', False),
+            'holc_grade': c.get('holc_grade', 'N/A'),
+            'barrier_to_entry': c.get('barrier_to_entry', 'Unknown'),
             'total_pop': c.get('total_pop', 0),
             'search_lat': lat,
             'search_lng': lng
@@ -364,6 +375,53 @@ def serve_plot(filename):
             print(f"Error serving/generating plot: {e}")
             
     return send_from_directory('static/plots', filename)
+
+@app.route('/state_tracts', methods=['GET'])
+def state_tracts():
+    """Fetches all census tracts for a given state with demographic info."""
+    state_fips = request.args.get('state')
+    if not state_fips:
+        return jsonify({"error": "Missing state FIPS code"}), 400
+    
+    # Fetch all tracts in the state
+    vars = "NAME,B01003_001E,B02001_003E,B17001_001E,B17001_002E"
+    base_url = f"https://api.census.gov/data/2022/acs/acs5"
+    census_key = get_census_key()
+    if not census_key:
+        # Fallback for testing environment if Secret Manager is down
+        census_key = os.environ.get("CENSUS_API_KEY") 
+        
+    params = { "get": vars, "for": "tract:*", "in": f"state:{state_fips}", "key": census_key }
+    
+    try:
+        import requests
+        response = requests.get(base_url, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            # Convert to list of dicts
+            header = data[0]
+            rows = data[1:]
+            results = []
+            for r in rows:
+                item = dict(zip(header, r))
+                total_pop = int(item['B01003_001E']) if item['B01003_001E'] else 0
+                black_pop = int(item['B02001_003E']) if item['B02001_003E'] else 0
+                pov_total = int(item['B17001_001E']) if item['B17001_001E'] else 0
+                below_pov = int(item['B17001_002E']) if item['B17001_002E'] else 0
+                
+                results.append({
+                    "name": item['NAME'],
+                    "tract": item['tract'],
+                    "county": item['county'],
+                    "total_pop": total_pop,
+                    "pct_black": round((black_pop / total_pop) * 100, 2) if total_pop > 0 else 0,
+                    "pct_poverty": round((below_pov / pov_total) * 100, 2) if pov_total > 0 else 0
+                })
+            return jsonify({"state": state_fips, "count": len(results), "tracts": results})
+        else:
+            return jsonify({"error": f"Census API error: {response.status_code}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8082))

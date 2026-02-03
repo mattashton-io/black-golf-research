@@ -8,7 +8,7 @@ import argparse
 from datetime import datetime
 
 # Configuration
-BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:8082")
+BASE_URL = os.environ.get("TEST_BASE_URL", "https://black-golf-research-3feb26-396631018769.us-east4.run.app")
 ZCTA_URL = "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/2020_Gaz_zcta_national.zip"
 OUTPUT_FILE = "comprehensive_test_report.md"
 
