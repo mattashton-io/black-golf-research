@@ -15,7 +15,8 @@
     - Enrichment OK: 1/1
 
 ## Proposed Tasks
-
+* [x] update agents to use new path for task.md and spec.md
+* [x] Median Income value and Poverty Rate title overlap in text now. Adjust modal width and/or text to fix overlap.
 ## Permanent Tasks
 - Ensure libraries and code comply with spec.md and persona.md
 - Update "Current Status" section of this document as needed

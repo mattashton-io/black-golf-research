@@ -76,7 +76,7 @@ def get_weather_for_location(lat, lng):
         w_resp = requests.get(weather_url, params=params, timeout=5)
         if w_resp.status_code == 200:
             w_data = w_resp.json()
-            # Save raw weather data for debugging as requested in task.md
+            # Save raw weather data for debugging as requested in plan/task.md
             try:
                 os.makedirs("temp", exist_ok=True)
                 with open("temp/last_weather_call.json", "w") as f:
@@ -176,7 +176,7 @@ def search():
     if cached_data and isinstance(cached_data, dict):
         # Ensure cached data is complete for frontend and contains NEW demographics
         courses = cached_data.get('courses', [])
-        # Strict validation based on spec.md
+        # Strict validation based on plan/spec.md
         mandatory_fields = ['pct_poverty', 'holc_grade', 'barrier_to_entry', 'total_pop']
         is_complete = courses and all(all(f in c for f in mandatory_fields) for c in courses)
         
