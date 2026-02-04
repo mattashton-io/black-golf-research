@@ -233,8 +233,9 @@
                 center: { lat: 38.9383, lng: -76.8202 }, // Default to DC
                 zoom: 10,
                 styles: [
-                    { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#000000" }] },
-                    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c8d7d4" }] }
+                    { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#1A1A1A" }] },
+                    { "featureType": "landscape", "elementType": "geometry", "stylers": [{ "color": "#E8D9C5" }] },
+                    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#2C3E75" }] }
                 ]
             });
         }
@@ -604,8 +605,9 @@
                                 { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] }
                             ];
                             const lightStyle = [
-                                { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#000000" }] },
-                                { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c8d7d4" }] }
+                                { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#1A1A1A" }] },
+                                { "featureType": "landscape", "elementType": "geometry", "stylers": [{ "color": "#E8D9C5" }] },
+                                { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#2C3E75" }] }
                             ];
                             map.setOptions({ styles: isDark ? darkStyle : lightStyle });
                         }

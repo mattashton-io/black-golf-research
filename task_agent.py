@@ -5,7 +5,7 @@ import re
 import json
 
 # Configuration
-TASK_FILE = "task.md"
+TASK_FILE = "plan/task.md"
 TEST_REPORT = "comprehensive_test_report.md"
 TARGET_SECTION = "## Current Status"
 

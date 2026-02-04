@@ -152,18 +152,31 @@ def generate_plots(df, output_dir="static", zip_code=None, dark_mode=False):
     saved_files.append(filename_comp)
 
     # Task 8: The Research Funnel Pyramid
-    plt.figure(figsize=(8, 6))
-    layers = ['ZIPS SCANNED', 'COURSES FOUND', 'MAJORITY BLACK']
-    counts = [1, len(df), len(df[df['pct_black'] > 50])]
-    colors = [DUB_INDIGO, DUB_RED, DUB_GOLD]
+    plt.figure(figsize=(8, 8))
+    # Logic: Zips -> Courses -> Enriched -> Majority Black
+    enriched_count = df[df['total_pop'] > 0].shape[0] if 'total_pop' in df.columns else len(df)
+    maj_black_count = df[df['pct_black'] > 50].shape[0]
+    
+    layers = ['ZIPS SCANNED', 'COURSES FOUND', 'ENRICHED DATA', 'MAJORITY BLACK']
+    counts = [1, len(df), enriched_count, maj_black_count]
+    colors = [DUB_INDIGO, DUB_RED, DUB_GOLD, GOLF_GREEN]
     
     for i, (layer, count, color) in enumerate(zip(layers, counts, colors)):
+        # Pyramid effect: width decreases as density increases in the funnel
         width = 1.0 - (i * 0.2)
-        plt.barh(i, width, color=color, edgecolor='black', linewidth=1.5)
-        plt.text(0, i, f"{layer}\n({count})", ha='center', va='center', color='white', fontweight='bold')
+        left = (1.0 - width) / 2
+        plt.barh(3-i, width, left=left, color=color, edgecolor='black', linewidth=1.5)
+        plt.text(0.5, 3-i, f"{layer}\n({count})", ha='center', va='center', color='white' if i < 2 else 'black', fontweight='bold', fontsize=10)
     
+    plt.xlim(0, 1)
     plt.axis('off')
     plt.title('THE RESEARCH FUNNEL', fontweight='bold', pad=20, color=text_color)
+    
+    filename_funnel = f"{prefix}research_funnel{suffix}.png"
+    path_funnel = os.path.join(output_dir, filename_funnel)
+    plt.savefig(path_funnel, facecolor=bg_color, edgecolor='none')
+    plt.close()
+    saved_files.append(filename_funnel)
     
     # Task 6: Scaled Progression Circles
     plt.figure(figsize=(6, 8))
@@ -199,19 +212,54 @@ def generate_plots(df, output_dir="static", zip_code=None, dark_mode=False):
         saved_files.append(filename_circles)
 
     # Task 7: Stacked Income Correlation Bar
-    if 'median_income' in df.columns:
-        plt.figure(figsize=(10, 4))
-        # Create income brackets
-        bins = [0, 50000, 100000, 150000, float('inf')]
-        labels = ['<$50k', '$50k-100k', '$100k-150k', '$150k+']
-        df['income_bracket'] = pd.cut(df['median_income'], bins=bins, labels=labels)
+    if 'median_income' in df.columns and 'distance' in df.columns:
+        plt.figure(figsize=(10, 5))
         
-        income_counts = df['income_bracket'].value_counts().reindex(labels).fillna(0)
+        # Distance groups
+        dist_bins = [0, 10, 25, float('inf')]
+        dist_labels = ['Near (<10mi)', 'Mid (10-25mi)', 'Far (25mi+)']
+        df['dist_group'] = pd.cut(df['distance'], bins=dist_bins, labels=dist_labels)
         
-        plt.barh(labels, income_counts, color=[DUB_INDIGO, DUB_RED, DUB_GOLD, GOLF_GREEN], 
-                 edgecolor='black', linewidth=1.5)
-        plt.title('MEDIAN INCOME CORRELATION', fontweight='bold', color=text_color)
+        # Income brackets
+        inc_bins = [0, 50000, 100000, 150000, float('inf')]
+        inc_labels = ['<$50k', '$50k-100k', '$100k-150k', '$150k+']
+        df['inc_bracket'] = pd.cut(df['median_income'], bins=inc_bins, labels=inc_labels)
+        
+        # Pivot table for stacked bar
+        pivot_df = df.pivot_table(index='dist_group', columns='inc_bracket', values='name', aggfunc='count', observed=False).fillna(0)
+        
+        # Du Bois Style: Hand-drawn feel with connecting lines
+        colors_inc = [DUB_INDIGO, DUB_RED, DUB_GOLD, GOLF_GREEN]
+        bottom = [0] * len(pivot_df)
+        
+        segment_boundaries = [] # To store (x_start, x_end) for connecting lines
+        
+        for i, (label, color) in enumerate(zip(inc_labels, colors_inc)):
+            counts = pivot_df[label].values
+            plt.barh(pivot_df.index.astype(str), counts, left=bottom, color=color, edgecolor='black', linewidth=1.2, label=label)
+            
+            # Store boundaries for connecting lines
+            current_boundaries = []
+            for j, val in enumerate(counts):
+                current_boundaries.append((bottom[j], bottom[j] + val))
+            segment_boundaries.append(current_boundaries)
+            
+            bottom = [b + v for b, v in zip(bottom, counts)]
+
+        # Add thin connecting lines to show demographic shifts
+        for i in range(len(inc_labels)):
+            for j in range(len(pivot_df) - 1):
+                # Connect boundary of segment i in group j to segment i in group j+1
+                y1, y2 = j, j + 1
+                # Boundaries of segment i are at segment_boundaries[i]
+                x1_top = segment_boundaries[i][j][1]
+                x2_top = segment_boundaries[i][j+1][1]
+                plt.plot([x1_top, x2_top], [y1 + 0.4, y2 - 0.4], color='black', alpha=0.3, linewidth=0.8)
+
+        plt.title('INCOME DISTRIBUTION BY DISTANCE', fontweight='bold', color=text_color)
+        plt.legend(title='Income Bracket', bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.xlabel('COURSE COUNT', color=text_color)
+        plt.tight_layout()
         
         filename_income = f"{prefix}income_correlation{suffix}.png"
         path_income = os.path.join(output_dir, filename_income)
