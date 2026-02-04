@@ -39,6 +39,24 @@ A web application to explore and analyze the geographic distribution of golf cou
 3. Run when deploying on GCP with public access prevention:
 gcloud run services proxy black-golf-research-21jan26 --project pytutoring-dev --region us-east4
 
+## Maintenance & Reliability
+
+### Automated Task Agent
+The project includes an automated agent to track progress and reliability:
+```bash
+python task_agent.py
+```
+This script:
+1. Summarizes the last 5 commits from git.
+2. Extracts the latest status from `comprehensive_test_report.md`.
+3. Updates the `## Current Status` section in `task.md` with a timestamped report.
+
+### Stress Testing
+Use the test agent to verify API connectivity and response parsing:
+```bash
+python test_agent.py --limit 10
+```
+
 ## Technology Stack
 - **Backend**: Python (Flask)
 - **Frontend**: HTML5, Vanilla CSS, Tailwind CSS, Chart.js
